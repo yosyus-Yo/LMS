@@ -130,6 +130,37 @@ const apiClient = {
     }
   },
 
+  // 사용자 관리 API (관리자용)
+  users: {
+    async getAll() {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        throw new Error(error.message)
+      }
+      
+      return { data }
+    },
+
+    async updateRole(userId: string, role: 'student' | 'instructor' | 'admin') {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update({ role })
+        .eq('id', userId)
+        .select()
+        .single()
+      
+      if (error) {
+        throw new Error(error.message)
+      }
+      
+      return { data }
+    }
+  },
+
   // 코스 관련 API
   courses: {
     async getAll(filters?: any) {
@@ -266,6 +297,21 @@ const apiClient = {
       const { data, error } = await supabase
         .from('courses')
         .update(courseData)
+        .eq('id', id)
+        .select()
+        .single()
+      
+      if (error) {
+        throw new Error(error.message)
+      }
+      
+      return { data }
+    },
+
+    async delete(id: string) {
+      const { data, error } = await supabase
+        .from('courses')
+        .delete()
         .eq('id', id)
         .select()
         .single()

@@ -16,26 +16,30 @@ interface DashboardStats {
 }
 
 interface User {
-  id: number;
+  id: string;
   email: string;
   first_name: string;
   last_name: string;
   role: string;
-  date_joined: string;
+  created_at: string;
   is_active: boolean;
 }
 
 interface Course {
-  id: number;
+  id: string;
   title: string;
-  instructor: {
+  instructor?: {
     first_name: string;
     last_name: string;
     email: string;
   };
+  instructor_id?: string;
   status: string;
-  enrollment_count: number;
+  enrollment_count?: number;
   created_at: string;
+  description?: string;
+  level?: string;
+  price?: number;
 }
 
 interface Payment {
@@ -57,6 +61,12 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'courses' | 'payments'>('overview');
+  
+  // 강의 관리 상태
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState<string | null>(null);
 
   // 관리자 권한 확인
   useEffect(() => {
@@ -76,13 +86,46 @@ const AdminDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setIsLoading(true);
+      console.log('🔄 관리자 대시보드 데이터 조회 시작');
       
-      // TODO: Supabase API로 대시보드 데이터 가져오기 구현 필요
-      console.log('Admin dashboard temporarily disabled for migration');
+      // 병렬로 데이터 조회
+      const [usersResult, coursesResult] = await Promise.allSettled([
+        apiClient.users.getAll(),
+        apiClient.courses.getAll({ includeAll: true })
+      ]);
+
+      let users: User[] = [];
+      let courses: Course[] = [];
       
-      // 임시 더미 데이터
-      const users: User[] = [];
-      const courses: Course[] = [];
+      // 사용자 데이터 처리
+      if (usersResult.status === 'fulfilled') {
+        users = usersResult.value.data || [];
+        console.log(`✅ 사용자 ${users.length}명 조회 성공`);
+      } else {
+        console.error('❌ 사용자 데이터 조회 실패:', usersResult.reason);
+      }
+
+      // 강의 데이터 처리
+      if (coursesResult.status === 'fulfilled') {
+        const coursesData = coursesResult.value.data || [];
+        courses = coursesData.map((course: any) => ({
+          id: course.id,
+          title: course.title,
+          instructor: course.instructor,
+          instructor_id: course.instructor_id,
+          status: course.status || 'draft',
+          enrollment_count: course.enrollment_count || 0,
+          created_at: course.created_at,
+          description: course.description,
+          level: course.level,
+          price: course.price
+        }));
+        console.log(`✅ 강의 ${courses.length}개 조회 성공`);
+      } else {
+        console.error('❌ 강의 데이터 조회 실패:', coursesResult.reason);
+      }
+
+      // 임시 결제 데이터 (실제 구현 시 결제 API 추가 필요)
       const payments: Payment[] = [];
 
       // 통계 계산
@@ -97,12 +140,24 @@ const AdminDashboard: React.FC = () => {
         totalCourses: courses.length,
         totalEnrollments,
         totalRevenue,
-        recentUsers: users.slice(0, 5),
-        recentCourses: courses.slice(0, 5),
+        recentUsers: users.slice(0, 10), // 최근 10명
+        recentCourses: courses.slice(0, 10), // 최근 10개
         recentPayments: payments.slice(0, 5)
       });
+
+      console.log('✅ 대시보드 데이터 조회 완료');
     } catch (error) {
-      console.error('대시보드 데이터 조회 실패:', error);
+      console.error('❌ 대시보드 데이터 조회 실패:', error);
+      // 에러 시 빈 데이터로 초기화
+      setStats({
+        totalUsers: 0,
+        totalCourses: 0,
+        totalEnrollments: 0,
+        totalRevenue: 0,
+        recentUsers: [],
+        recentCourses: [],
+        recentPayments: []
+      });
     } finally {
       setIsLoading(false);
     }
@@ -121,6 +176,110 @@ const AdminDashboard: React.FC = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // 사용자 역할 변경
+  const handleChangeUserRole = async (userId: string, newRole: 'student' | 'instructor' | 'admin') => {
+    try {
+      await apiClient.users.updateRole(userId, newRole);
+      
+      // 상태 업데이트
+      setStats(prevStats => {
+        if (!prevStats) return null;
+        return {
+          ...prevStats,
+          recentUsers: prevStats.recentUsers.map(user => 
+            user.id === userId ? { ...user, role: newRole } : user
+          )
+        };
+      });
+      
+      alert('사용자 역할이 변경되었습니다.');
+    } catch (error) {
+      console.error('사용자 역할 변경 실패:', error);
+      alert('사용자 역할 변경에 실패했습니다.');
+    }
+  };
+
+  // 강의 수정 핸들러
+  const handleEditCourse = (course: Course) => {
+    setEditingCourse(course);
+    setIsEditModalOpen(true);
+  };
+
+  // 강의 삭제 핸들러
+  const handleDeleteCourse = (courseId: string) => {
+    setCourseToDelete(courseId);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  // 강의 삭제 확인
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return;
+
+    try {
+      console.log('강의 삭제 시작:', courseToDelete);
+      
+      // 실제 API 호출로 강의 삭제
+      await apiClient.courses.delete(courseToDelete);
+      console.log('✅ 강의 삭제 성공');
+      
+      // 상태에서 제거
+      setStats(prevStats => {
+        if (!prevStats) return null;
+        return {
+          ...prevStats,
+          recentCourses: prevStats.recentCourses.filter(course => course.id !== courseToDelete),
+          totalCourses: prevStats.totalCourses - 1
+        };
+      });
+
+      alert('강의가 삭제되었습니다.');
+      setIsDeleteConfirmOpen(false);
+      setCourseToDelete(null);
+    } catch (error) {
+      console.error('❌ 강의 삭제 실패:', error);
+      alert(`강의 삭제에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      setIsDeleteConfirmOpen(false);
+      setCourseToDelete(null);
+    }
+  };
+
+  // 강의 수정 저장
+  const handleSaveCourse = async (updatedCourse: Course) => {
+    try {
+      console.log('강의 수정 시작:', updatedCourse);
+      
+      // 실제 API 호출로 강의 수정
+      const updateData = {
+        title: updatedCourse.title,
+        status: updatedCourse.status,
+        enrollment_count: updatedCourse.enrollment_count
+      };
+      
+      const result = await apiClient.courses.update(updatedCourse.id, updateData);
+      console.log('✅ 강의 수정 성공:', result);
+      
+      // 상태에서 업데이트
+      setStats(prevStats => {
+        if (!prevStats) return null;
+        return {
+          ...prevStats,
+          recentCourses: prevStats.recentCourses.map(course => 
+            course.id === updatedCourse.id ? updatedCourse : course
+          )
+        };
+      });
+
+      alert('강의가 수정되었습니다.');
+      setIsEditModalOpen(false);
+      setEditingCourse(null);
+    } catch (error) {
+      console.error('❌ 강의 수정 실패:', error);
+      alert(`강의 수정에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      setIsEditModalOpen(false);
+      setEditingCourse(null);
+    }
   };
 
   const getStatusBadge = (status: string | boolean, type: 'user' | 'course' | 'payment') => {
@@ -333,7 +492,12 @@ const AdminDashboard: React.FC = () => {
 
             {activeTab === 'users' && (
               <div className="p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">최근 가입 사용자</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">사용자 관리</h3>
+                  <div className="text-sm text-gray-600">
+                    총 {stats.recentUsers.length}명
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -342,30 +506,53 @@ const AdminDashboard: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">역할</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">가입일</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">관리</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {stats.recentUsers.map((user) => (
-                        <tr key={user.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {user.first_name} {user.last_name}
+                      {stats.recentUsers.length > 0 ? (
+                        stats.recentUsers.map((user) => (
+                          <tr key={user.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {user.first_name && user.last_name 
+                                    ? `${user.first_name} ${user.last_name}` 
+                                    : user.email.split('@')[0]
+                                  }
+                                </div>
+                                <div className="text-sm text-gray-500">{user.email}</div>
                               </div>
-                              <div className="text-sm text-gray-500">{user.email}</div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {user.role === 'admin' ? '관리자' : user.role === 'instructor' ? '강사' : '학생'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatDate(user.date_joined)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {getStatusBadge(user.is_active, 'user')}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <select
+                                value={user.role}
+                                onChange={(e) => handleChangeUserRole(user.id, e.target.value as 'student' | 'instructor' | 'admin')}
+                                className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              >
+                                <option value="student">학생</option>
+                                <option value="instructor">강사</option>
+                                <option value="admin">관리자</option>
+                              </select>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDate(user.created_at)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {getStatusBadge(user.is_active ?? true, 'user')}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <span className="text-gray-400">관리 기능 준비중</span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                            등록된 사용자가 없습니다.
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -374,7 +561,28 @@ const AdminDashboard: React.FC = () => {
 
             {activeTab === 'courses' && (
               <div className="p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">최근 등록 강의</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">강의 관리</h3>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-sm text-gray-600">
+                      총 {stats.recentCourses.length}개 강의
+                    </div>
+                    <div className="flex space-x-2">
+                      <Link to="/admin/course/create">
+                        <Button variant="primary" size="sm">
+                          새 강의 추가
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={fetchDashboardData}
+                      >
+                        새로고침
+                      </Button>
+                    </div>
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -384,31 +592,71 @@ const AdminDashboard: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">수강생</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">등록일</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">관리</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {stats.recentCourses.map((course) => (
-                        <tr key={course.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{course.title}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {course.instructor.first_name} {course.instructor.last_name}
-                            </div>
-                            <div className="text-sm text-gray-500">{course.instructor.email}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {course.enrollment_count}명
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {getStatusBadge(course.status, 'course')}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatDate(course.created_at)}
+                      {stats.recentCourses.length > 0 ? (
+                        stats.recentCourses.map((course) => (
+                          <tr key={course.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{course.title}</div>
+                                {course.description && (
+                                  <div className="text-xs text-gray-500 mt-1 max-w-xs truncate">
+                                    {course.description}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {course.instructor ? (
+                                <div>
+                                  <div className="text-sm text-gray-900">
+                                    {course.instructor.first_name} {course.instructor.last_name}
+                                  </div>
+                                  <div className="text-sm text-gray-500">{course.instructor.email}</div>
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500">
+                                  강사 정보 없음
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {course.enrollment_count || 0}명
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {getStatusBadge(course.status, 'course')}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDate(course.created_at)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleEditCourse(course)}
+                                  className="text-indigo-600 hover:text-indigo-900"
+                                >
+                                  수정
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCourse(course.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  삭제
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                            등록된 강의가 없습니다.
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -459,8 +707,167 @@ const AdminDashboard: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* 강의 수정 모달 */}
+        {isEditModalOpen && editingCourse && (
+          <CourseEditModal
+            course={editingCourse}
+            onSave={handleSaveCourse}
+            onClose={() => {
+              setIsEditModalOpen(false);
+              setEditingCourse(null);
+            }}
+          />
+        )}
+
+        {/* 강의 삭제 확인 모달 */}
+        {isDeleteConfirmOpen && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+              <div className="mt-3 text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                  <svg
+                    className="h-6 w-6 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mt-2">
+                  강의 삭제 확인
+                </h3>
+                <div className="mt-2 px-7 py-3">
+                  <p className="text-sm text-gray-500">
+                    이 강의를 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                  </p>
+                </div>
+                <div className="items-center px-4 py-3">
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => {
+                        setIsDeleteConfirmOpen(false);
+                        setCourseToDelete(null);
+                      }}
+                      className="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={confirmDeleteCourse}
+                      className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
+  );
+};
+
+// 강의 수정 모달 컴포넌트
+interface CourseEditModalProps {
+  course: Course;
+  onSave: (course: Course) => void;
+  onClose: () => void;
+}
+
+const CourseEditModal: React.FC<CourseEditModalProps> = ({ course, onSave, onClose }) => {
+  const [formData, setFormData] = useState({
+    title: course.title,
+    status: course.status,
+    enrollment_count: course.enrollment_count
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      ...course,
+      title: formData.title,
+      status: formData.status,
+      enrollment_count: formData.enrollment_count
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="mt-3">
+          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+            강의 수정
+          </h3>
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                강의명
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({...formData, title: e.target.value})}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                상태
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({...formData, status: e.target.value})}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="draft">초안</option>
+                <option value="published">게시됨</option>
+                <option value="archived">보관됨</option>
+              </select>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                수강생 수
+              </label>
+              <input
+                type="number"
+                value={formData.enrollment_count}
+                onChange={(e) => setFormData({...formData, enrollment_count: parseInt(e.target.value) || 0})}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                min="0"
+              />
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-indigo-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              >
+                저장
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 };
 

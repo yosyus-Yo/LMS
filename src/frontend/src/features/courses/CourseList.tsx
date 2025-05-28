@@ -38,6 +38,12 @@ const CourseList: React.FC = () => {
   const isAdmin = user?.role === 'admin';
   const isAuthenticated = !!user;
 
+  // 강의 관리 상태
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchCourses = async () => {
       try {
@@ -212,6 +218,76 @@ const CourseList: React.FC = () => {
 
     setFilteredCourses(filtered);
   }, [courses, searchTerm, selectedCategory, selectedLevel]);
+
+  // 강의 관리 핸들러들
+  const handleEditCourse = (course: Course) => {
+    setEditingCourse(course);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteCourse = (courseId: string) => {
+    setCourseToDelete(courseId);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return;
+
+    try {
+      console.log('강의 삭제 시작:', courseToDelete);
+      
+      // 실제 API 호출로 강의 삭제
+      await apiClient.courses.delete(courseToDelete);
+      console.log('✅ 강의 삭제 성공');
+      
+      // 상태에서 제거
+      setCourses(prevCourses => prevCourses.filter(course => course.id !== courseToDelete));
+      
+      alert('강의가 삭제되었습니다.');
+      setIsDeleteConfirmOpen(false);
+      setCourseToDelete(null);
+    } catch (error) {
+      console.error('❌ 강의 삭제 실패:', error);
+      alert(`강의 삭제에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      setIsDeleteConfirmOpen(false);
+      setCourseToDelete(null);
+    }
+  };
+
+  const handleSaveCourse = async (updatedCourse: Course) => {
+    try {
+      console.log('강의 수정 시작:', updatedCourse);
+      
+      // 실제 API 호출로 강의 수정
+      const updateData = {
+        title: updatedCourse.title,
+        description: updatedCourse.description,
+        level: updatedCourse.level,
+        status: updatedCourse.status,
+        price: updatedCourse.price,
+        is_free: updatedCourse.is_free
+      };
+      
+      const result = await apiClient.courses.update(updatedCourse.id, updateData);
+      console.log('✅ 강의 수정 성공:', result);
+      
+      // 상태에서 업데이트
+      setCourses(prevCourses => 
+        prevCourses.map(course => 
+          course.id === updatedCourse.id ? updatedCourse : course
+        )
+      );
+
+      alert('강의가 수정되었습니다.');
+      setIsEditModalOpen(false);
+      setEditingCourse(null);
+    } catch (error) {
+      console.error('❌ 강의 수정 실패:', error);
+      alert(`강의 수정에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      setIsEditModalOpen(false);
+      setEditingCourse(null);
+    }
+  };
 
   // 카테고리 옵션 추출
   const allCategories = Array.from(
@@ -408,11 +484,29 @@ const CourseList: React.FC = () => {
                   
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-500">{course.duration}</span>
-                    <Link to={`/courses/${course.id}`}>
-                      <Button variant="primary" size="sm">
-                        자세히 보기
-                      </Button>
-                    </Link>
+                    <div className="flex space-x-2">
+                      <Link to={`/courses/${course.id}`}>
+                        <Button variant="primary" size="sm">
+                          자세히 보기
+                        </Button>
+                      </Link>
+                      {isAdmin && (
+                        <div className="flex space-x-1">
+                          <button
+                            onClick={() => handleEditCourse(course)}
+                            className="px-2 py-1 text-xs bg-indigo-100 text-indigo-600 rounded hover:bg-indigo-200"
+                          >
+                            수정
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCourse(course.id)}
+                            className="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -455,8 +549,223 @@ const CourseList: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* 강의 수정 모달 */}
+        {isEditModalOpen && editingCourse && (
+          <CourseEditModal
+            course={editingCourse}
+            onSave={handleSaveCourse}
+            onClose={() => {
+              setIsEditModalOpen(false);
+              setEditingCourse(null);
+            }}
+          />
+        )}
+
+        {/* 강의 삭제 확인 모달 */}
+        {isDeleteConfirmOpen && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+              <div className="mt-3 text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                  <svg
+                    className="h-6 w-6 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mt-2">
+                  강의 삭제 확인
+                </h3>
+                <div className="mt-2 px-7 py-3">
+                  <p className="text-sm text-gray-500">
+                    이 강의를 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                  </p>
+                </div>
+                <div className="items-center px-4 py-3">
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => {
+                        setIsDeleteConfirmOpen(false);
+                        setCourseToDelete(null);
+                      }}
+                      className="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={confirmDeleteCourse}
+                      className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
+  );
+};
+
+// 강의 수정 모달 컴포넌트
+interface CourseEditModalProps {
+  course: Course;
+  onSave: (course: Course) => void;
+  onClose: () => void;
+}
+
+const CourseEditModal: React.FC<CourseEditModalProps> = ({ course, onSave, onClose }) => {
+  const [formData, setFormData] = useState<{
+    title: string;
+    description: string;
+    level: 'beginner' | 'intermediate' | 'advanced';
+    status: string;
+    price: number;
+    is_free: boolean;
+  }>({
+    title: course.title,
+    description: course.description,
+    level: course.level,
+    status: course.status,
+    price: course.price,
+    is_free: course.is_free
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      ...course,
+      title: formData.title,
+      description: formData.description,
+      level: formData.level,
+      status: formData.status,
+      price: formData.price,
+      is_free: formData.is_free
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-10 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white max-h-screen overflow-y-auto">
+        <div className="mt-3">
+          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+            강의 수정
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                강의명
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({...formData, title: e.target.value})}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                설명
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                레벨
+              </label>
+              <select
+                value={formData.level}
+                onChange={(e) => setFormData({...formData, level: e.target.value as 'beginner' | 'intermediate' | 'advanced'})}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="beginner">초급</option>
+                <option value="intermediate">중급</option>
+                <option value="advanced">고급</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                상태
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({...formData, status: e.target.value})}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="draft">초안</option>
+                <option value="published">게시됨</option>
+                <option value="archived">보관됨</option>
+              </select>
+            </div>
+
+            <div>
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id="is_free"
+                  checked={formData.is_free}
+                  onChange={(e) => setFormData({...formData, is_free: e.target.checked, price: e.target.checked ? 0 : formData.price})}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label htmlFor="is_free" className="ml-2 block text-sm text-gray-900">
+                  무료 강의
+                </label>
+              </div>
+              {!formData.is_free && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    가격 (원)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => setFormData({...formData, price: parseInt(e.target.value) || 0})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    min="0"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-indigo-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              >
+                저장
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 };
 

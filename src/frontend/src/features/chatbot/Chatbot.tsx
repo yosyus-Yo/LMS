@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import Button from '../../components/common/Button';
+import { groqService, ChatMessage } from '../../services/groqService';
 
 interface Message {
   id: string;
@@ -9,14 +9,8 @@ interface Message {
 }
 
 const Chatbot: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: '안녕하세요! AI 튜터입니다. 학습에 관한 질문이 있으시면 언제든지 물어보세요.',
-      sender: 'bot',
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [inputMessage, setInputMessage] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -27,13 +21,31 @@ const Chatbot: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = () => {
+  // 첫 로드 시 환영 메시지 표시
+  useEffect(() => {
+    if (isFirstLoad && isOpen) {
+      const welcomeMessage: Message = {
+        id: 'welcome',
+        text: groqService.isReady() 
+          ? '안녕하세요! AI-LMS 어시스턴트입니다. 학습에 관한 질문이 있으시면 언제든지 물어보세요! 🎓' 
+          : '안녕하세요! 현재 AI 서비스가 설정되지 않아 제한된 기능만 제공됩니다. 기본적인 질문은 답변해드릴 수 있어요.',
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+      setMessages([welcomeMessage]);
+      setIsFirstLoad(false);
+    }
+  }, [isOpen, isFirstLoad]);
+
+  const handleSendMessage = async () => {
     if (inputMessage.trim() === '') return;
 
+    const userMessageText = inputMessage.trim();
+    
     // 사용자 메시지 추가
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputMessage,
+      text: userMessageText,
       sender: 'user',
       timestamp: new Date(),
     };
@@ -42,41 +54,57 @@ const Chatbot: React.FC = () => {
     setInputMessage('');
     setIsTyping(true);
 
-    // 실제 API 연동 시 이 부분을 대체
-    // AI 응답 시뮬레이션 (실제 구현 시 OpenAI API 호출)
-    setTimeout(() => {
-      const botResponses: { [key: string]: string } = {
-        '안녕': '안녕하세요! 오늘 어떤 학습을 도와드릴까요?',
-        '파이썬': '파이썬은 초보자도 배우기 쉬운 프로그래밍 언어입니다. 어떤 부분이 궁금하신가요?',
-        '자바스크립트': '자바스크립트는 웹 개발에 널리 사용되는 언어입니다. 특정 개념이 궁금하신가요?',
-        '머신러닝': '머신러닝은 AI의 핵심 분야입니다. 기초부터 차근차근 배워보는 것을 추천드립니다.',
-      };
+    try {
+      // 대화 히스토리를 ChatMessage 형식으로 변환
+      const conversationHistory: ChatMessage[] = messages.map((msg, index) => ({
+        id: msg.id,
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.text,
+        timestamp: msg.timestamp
+      }));
 
+      // Groq API 호출
+      const response = await groqService.sendMessage(userMessageText, conversationHistory);
+      
       let botReply = '';
       
-      // 간단한 키워드 매칭 (실제 구현에서는 AI 모델 활용)
-      for (const keyword in botResponses) {
-        if (inputMessage.toLowerCase().includes(keyword.toLowerCase())) {
-          botReply = botResponses[keyword];
-          break;
+      if (response.success && response.message) {
+        botReply = response.message;
+      } else {
+        // API 실패 시 빠른 응답으로 fallback
+        console.log('Groq API 실패, 빠른 응답으로 fallback:', response.error);
+        const quickResponse = await groqService.getQuickResponse(userMessageText);
+        
+        if (quickResponse.success && quickResponse.message) {
+          botReply = quickResponse.message;
+        } else {
+          botReply = '죄송합니다. 일시적으로 응답할 수 없습니다. 잠시 후 다시 시도해주세요. 🤔';
         }
-      }
-      
-      // 매칭되는 키워드가 없는 경우 기본 응답
-      if (!botReply) {
-        botReply = '흥미로운 질문이네요! 좀 더 자세히 설명해주시면 더 정확한 답변을 드릴 수 있을 것 같아요.';
       }
 
       const botMessage: Message = {
-        id: Date.now().toString(),
+        id: (Date.now() + 1).toString(),
         text: botReply,
         sender: 'bot',
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, botMessage]);
+      
+    } catch (error) {
+      console.error('챗봇 응답 오류:', error);
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: '죄송합니다. 시스템에 일시적인 문제가 발생했습니다. 다시 시도해주세요.',
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
