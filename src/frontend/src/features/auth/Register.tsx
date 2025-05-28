@@ -8,21 +8,26 @@ import Layout from '../../components/common/Layout';
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
     password: '',
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    role: 'student' as 'student' | 'instructor' | 'admin',
+    phoneNumber: '',
+    address: '',
+    organization: '',
+    jobTitle: '',
+    bio: '',
   });
   
   const [formErrors, setFormErrors] = useState({
-    username: '',
     email: '',
     password: '',
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    phoneNumber: '',
   });
   
   const dispatch = useAppDispatch();
@@ -41,33 +46,24 @@ const Register: React.FC = () => {
     };
   }, [isAuthenticated, navigate, dispatch]);
   
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: value,
+      [name]: name === 'role' ? value as 'student' | 'instructor' | 'admin' : value,
     });
   };
   
   const validateForm = (): boolean => {
     let valid = true;
     const newErrors = {
-      username: '',
       email: '',
       password: '',
       confirmPassword: '',
       firstName: '',
       lastName: '',
+      phoneNumber: '',
     };
-    
-    // 사용자 이름 검증
-    if (!formData.username.trim()) {
-      newErrors.username = '사용자 이름을 입력해주세요';
-      valid = false;
-    } else if (formData.username.length < 3) {
-      newErrors.username = '사용자 이름은 최소 3자 이상이어야 합니다';
-      valid = false;
-    }
     
     // 이메일 검증
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -108,6 +104,12 @@ const Register: React.FC = () => {
       valid = false;
     }
     
+    // 전화번호 검증 (선택사항)
+    if (formData.phoneNumber && !/^[0-9-+\s()]+$/.test(formData.phoneNumber)) {
+      newErrors.phoneNumber = '올바른 전화번호 형식이 아닙니다';
+      valid = false;
+    }
+    
     setFormErrors(newErrors);
     return valid;
   };
@@ -118,41 +120,33 @@ const Register: React.FC = () => {
     if (validateForm()) {
       try {
         console.log('Submitting registration data:', {
-          username: formData.username,
           email: formData.email,
           password: '***HIDDEN***',
           first_name: formData.firstName,
           last_name: formData.lastName,
         });
         
-        // 개발 모드에서 사용자 이름 저장
-        if (process.env.NODE_ENV === 'development') {
-          localStorage.setItem('dev_username', formData.username);
-        }
-        
         await dispatch(register({
-          username: formData.username,
           email: formData.email,
           password: formData.password,
           password_confirm: formData.confirmPassword,
           first_name: formData.firstName,
           last_name: formData.lastName,
+          role: formData.role,
+          phone_number: formData.phoneNumber,
+          address: formData.address,
+          organization: formData.organization,
+          job_title: formData.jobTitle,
+          bio: formData.bio,
         })).unwrap();
         
         // 회원가입 성공 시 로그인 페이지로 이동
         alert('회원가입이 성공적으로 완료되었습니다. 로그인 페이지로 이동합니다.');
         navigate('/login');
       } catch (err: any) {
-        // 회원가입 실패 처리는 authSlice의 extraReducers에서 처리됨
         console.error('Registration failed', err);
-        
-        // 개발 환경에서는 항상 성공으로 처리
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Development mode: Bypassing registration error');
-          localStorage.setItem('dev_username', formData.username);
-          alert('개발 모드: 회원가입 성공으로 처리합니다. 로그인 페이지로 이동합니다.');
-          navigate('/login');
-        }
+        // 에러 처리는 authSlice의 extraReducers에서 처리됨
+        // 이메일 중복 등의 에러 메시지가 Redux store의 error 상태에 저장되어 UI에 표시됨
       }
     }
   };
@@ -195,17 +189,6 @@ const Register: React.FC = () => {
             />
           </div>
           
-          <Input
-            id="username"
-            name="username"
-            type="text"
-            label="사용자 이름"
-            value={formData.username}
-            onChange={handleChange}
-            placeholder="사용자 이름"
-            error={formErrors.username}
-            fullWidth
-          />
           
           <Input
             id="email"
@@ -242,6 +225,151 @@ const Register: React.FC = () => {
             error={formErrors.confirmPassword}
             fullWidth
           />
+          
+          {/* 역할 선택 */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              가입 유형을 선택해주세요 *
+            </label>
+            
+            <div className="space-y-3">
+              {/* 학생 선택 */}
+              <div
+                className={`relative flex cursor-pointer rounded-lg border p-4 transition-all ${
+                  formData.role === 'student'
+                    ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600'
+                    : 'border-gray-300 bg-white hover:bg-gray-50'
+                }`}
+                onClick={() => setFormData({ ...formData, role: 'student' })}
+              >
+                <div className="flex h-5 items-center">
+                  <input
+                    id="role-student"
+                    name="role"
+                    type="radio"
+                    value="student"
+                    checked={formData.role === 'student'}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                  />
+                </div>
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-2">🎓</span>
+                    <label htmlFor="role-student" className="text-base font-medium text-gray-900 cursor-pointer">
+                      학생으로 가입
+                    </label>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    강의를 수강하고 학습할 수 있습니다. 개인정보 수정 권한을 가집니다.
+                  </p>
+                </div>
+              </div>
+
+              {/* 강사 선택 */}
+              <div
+                className={`relative flex cursor-pointer rounded-lg border p-4 transition-all ${
+                  formData.role === 'instructor'
+                    ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600'
+                    : 'border-gray-300 bg-white hover:bg-gray-50'
+                }`}
+                onClick={() => setFormData({ ...formData, role: 'instructor' })}
+              >
+                <div className="flex h-5 items-center">
+                  <input
+                    id="role-instructor"
+                    name="role"
+                    type="radio"
+                    value="instructor"
+                    checked={formData.role === 'instructor'}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                  />
+                </div>
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-2">👨‍🏫</span>
+                    <label htmlFor="role-instructor" className="text-base font-medium text-gray-900 cursor-pointer">
+                      강사로 가입
+                    </label>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    강의를 생성하고 수강생을 관리할 수 있습니다. (수강생 이름, 이메일만 조회 가능)
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* 추가 정보 섹션 */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">선택 정보</h3>
+            <p className="text-sm text-gray-600 mb-4">아래 정보는 선택사항이며, 나중에 프로필에서 수정할 수 있습니다.</p>
+            
+            <div className="space-y-4">
+              <Input
+                id="phoneNumber"
+                name="phoneNumber"
+                type="tel"
+                label="전화번호"
+                value={formData.phoneNumber}
+                onChange={handleChange}
+                placeholder="010-1234-5678"
+                error={formErrors.phoneNumber}
+                fullWidth
+              />
+              
+              <Input
+                id="address"
+                name="address"
+                type="text"
+                label="주소"
+                value={formData.address}
+                onChange={handleChange}
+                placeholder="서울시 강남구..."
+                fullWidth
+              />
+              
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Input
+                  id="organization"
+                  name="organization"
+                  type="text"
+                  label="소속 기관"
+                  value={formData.organization}
+                  onChange={handleChange}
+                  placeholder="회사명 또는 학교명"
+                  fullWidth
+                />
+                
+                <Input
+                  id="jobTitle"
+                  name="jobTitle"
+                  type="text"
+                  label="직책"
+                  value={formData.jobTitle}
+                  onChange={handleChange}
+                  placeholder="개발자, 학생 등"
+                  fullWidth
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">
+                  자기소개
+                </label>
+                <textarea
+                  id="bio"
+                  name="bio"
+                  rows={3}
+                  value={formData.bio}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="간단한 자기소개를 입력해주세요..."
+                />
+              </div>
+            </div>
+          </div>
           
           <div className="flex items-center">
             <input

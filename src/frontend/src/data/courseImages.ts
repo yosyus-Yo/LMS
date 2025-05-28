@@ -5,7 +5,22 @@ const courseImages = {
     small: '/images/courses/python.jpg',
     large: '/images/courses/python-large.jpg',
     placeholder: 'https://images.unsplash.com/photo-1526379879527-8559ecfcb0c8?w=600&auto=format&fit=crop&q=80',
+    django: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=600&auto=format&fit=crop&q=80',
     alt: '파이썬 프로그래밍 언어 로고와 코드 화면'
+  },
+  javascript: {
+    react: 'https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?w=600&auto=format&fit=crop&q=80',
+    nodejs: 'https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=600&auto=format&fit=crop&q=80',
+    placeholder: 'https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?w=600&auto=format&fit=crop&q=80',
+  },
+  typescript: {
+    basics: 'https://images.unsplash.com/photo-1618477388954-7852f32655ec?w=600&auto=format&fit=crop&q=80',
+  },
+  vue: {
+    basics: 'https://images.unsplash.com/photo-1622542796254-5b9c46ab0d2f?w=600&auto=format&fit=crop&q=80',
+  },
+  aws: {
+    basics: 'https://images.unsplash.com/photo-1523474253046-8cd2748b5fd2?w=600&auto=format&fit=crop&q=80',
   },
   webDev: {
     small: '/images/courses/web-dev.jpg',

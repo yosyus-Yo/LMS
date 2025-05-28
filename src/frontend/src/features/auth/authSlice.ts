@@ -4,11 +4,10 @@ import { jwtDecode } from 'jwt-decode';
 
 // 타입 정의
 interface User {
-  id: number;
-  username: string;
+  id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  first_name?: string;
+  last_name?: string;
   role: 'student' | 'instructor' | 'admin';
 }
 
@@ -26,52 +25,69 @@ interface LoginCredentials {
 }
 
 interface RegisterCredentials {
-  username: string;
   email: string;
   password: string;
   password_confirm: string;
   first_name: string;
   last_name: string;
+  role: 'student' | 'instructor' | 'admin';
+  phone_number?: string;
+  address?: string;
+  organization?: string;
+  job_title?: string;
+  bio?: string;
 }
 
 interface LoginResponse {
-  access: string;
-  refresh: string;
   user: User;
+  token: string;
 }
 
-// 초기 상태
-const initialState: AuthState = {
-  token: localStorage.getItem('token'),
-  user: null,
-  isAuthenticated: localStorage.getItem('token') ? true : false,
-  isLoading: false,
-  error: null,
+// localStorage에서 사용자 정보 복원
+const getInitialAuthState = (): AuthState => {
+  try {
+    const token = localStorage.getItem('token');
+    const userString = localStorage.getItem('user');
+    
+    if (token && userString) {
+      const user = JSON.parse(userString);
+      return {
+        token,
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      };
+    }
+  } catch (error) {
+    console.error('로컬 저장소에서 인증 정보 복원 실패:', error);
+    // 오류 시 localStorage 정리
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  }
+  
+  return {
+    token: null,
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+    error: null,
+  };
 };
 
-// 로그인 비동기 액션
+// 초기 상태
+const initialState: AuthState = getInitialAuthState();
+
+// 로그인 비동기 액션 (Supabase 통합)
 export const login = createAsyncThunk(
   'auth/login',
   async (credentials: LoginCredentials, { rejectWithValue }) => {
     try {
-      // 백엔드 API 엔드포인트로 요청
-      const response = await apiClient.post<LoginResponse>(
-        '/api/auth/login/',
-        credentials
-      );
-      
-      // 로컬 스토리지에 토큰 저장
-      localStorage.setItem('token', response.data.access);
-      
+      const response = await apiClient.auth.login(credentials.email, credentials.password);
       return response.data;
     } catch (error: any) {
       console.error('Login error:', error);
-      
-      if (error.response) {
-        // 서버 응답 오류 처리
-        return rejectWithValue(error.response.data?.detail || error.response.data?.message || 'Login failed');
-      }
-      return rejectWithValue('Network error occurred. Please check your connection and try again.');
+      return rejectWithValue(error.message || 'Login failed');
     }
   }
 );
@@ -81,24 +97,29 @@ export const register = createAsyncThunk(
   'auth/register',
   async (credentials: RegisterCredentials, { rejectWithValue }) => {
     try {
-      // 실제 백엔드 API 요청
-      const response = await apiClient.post<User>(
-        '/api/auth/register/',
-        credentials
+      if (credentials.password !== credentials.password_confirm) {
+        return rejectWithValue('Passwords do not match');
+      }
+      
+      const response = await apiClient.auth.register(
+        credentials.email,
+        credentials.password,
+        credentials.first_name,
+        credentials.last_name,
+        credentials.role,
+        {
+          phone_number: credentials.phone_number,
+          address: credentials.address,
+          organization: credentials.organization,
+          job_title: credentials.job_title,
+          bio: credentials.bio,
+        }
       );
+      
       return response.data;
     } catch (error: any) {
       console.error('Registration error:', error);
-      
-      if (error.response) {
-        const errorMessage = 
-          error.response.data?.detail || 
-          error.response.data?.message || 
-          (typeof error.response.data === 'string' ? error.response.data : 'Registration failed');
-        return rejectWithValue(errorMessage);
-      }
-      
-      return rejectWithValue('Network error occurred. Please check your connection and try again.');
+      return rejectWithValue(error.message || 'Registration failed');
     }
   }
 );
@@ -106,33 +127,22 @@ export const register = createAsyncThunk(
 // 사용자 정보 가져오기 액션
 export const getUserProfile = createAsyncThunk(
   'auth/getUserProfile',
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const { auth } = getState() as { auth: AuthState };
+      const response = await apiClient.auth.getCurrentUser();
       
-      if (!auth.token) {
-        return rejectWithValue('No authentication token');
+      if (!response.data) {
+        return rejectWithValue('No user found');
       }
-      
-      // 실제 백엔드 API 요청
-      const response = await apiClient.get<User>('/api/auth/profile/');
-      // 토큰은 apiClient의 인터셉터에서 자동으로 추가됨
       
       return response.data;
     } catch (error: any) {
       console.error('Profile fetch error:', error);
-      
-      if (error.response) {
-        const errorMessage = 
-          error.response.data?.detail || 
-          error.response.data?.message || 
-          'Failed to fetch user profile';
-        return rejectWithValue(errorMessage);
-      }
-      return rejectWithValue('Network error occurred. Please check your connection and try again.');
+      return rejectWithValue(error.message || 'Failed to fetch user profile');
     }
   }
 );
+
 
 // Auth 슬라이스
 const authSlice = createSlice({
@@ -141,6 +151,7 @@ const authSlice = createSlice({
   reducers: {
     logout: (state) => {
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       state.token = null;
       state.user = null;
       state.isAuthenticated = false;
@@ -160,8 +171,12 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action: PayloadAction<LoginResponse>) => {
         state.isLoading = false;
         state.isAuthenticated = true;
-        state.token = action.payload.access;
+        state.token = action.payload.token;
         state.user = action.payload.user;
+        
+        // localStorage에 저장
+        localStorage.setItem('token', action.payload.token);
+        localStorage.setItem('user', JSON.stringify(action.payload.user));
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;
@@ -195,8 +210,9 @@ const authSlice = createSlice({
       .addCase(getUserProfile.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
-        // 토큰이 만료된 경우 로그아웃 처리
-        if (action.payload === 'Token is invalid or expired') {
+        // 인증 오류시 로그아웃 처리
+        const errorMessage = action.payload as string;
+        if (errorMessage?.includes('not authenticated') || errorMessage?.includes('No user found')) {
           state.token = null;
           state.user = null;
           state.isAuthenticated = false;

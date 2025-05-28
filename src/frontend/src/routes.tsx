@@ -4,6 +4,7 @@ import { Navigate, RouteObject } from 'react-router-dom';
 // 인증 관련
 import Login from './features/auth/Login';
 import Register from './features/auth/Register';
+import EnhancedRegister from './features/auth/EnhancedRegister';
 
 // 대시보드
 import Dashboard from './features/dashboard/Dashboard';
@@ -12,40 +13,25 @@ import Dashboard from './features/dashboard/Dashboard';
 import CourseList from './features/courses/CourseList';
 import CourseDetail from './features/courses/CourseDetail';
 
-// 임시 컴포넌트 (추후 실제 구현으로 대체)
-const Profile = () => <div>Profile Page</div>;
-const AdminDashboard = () => <div>Admin Dashboard Page</div>;
-const InstructorCourses = () => <div>Instructor Courses Page</div>;
+// 구독 관련
+import SubscriptionPage from './features/subscription/SubscriptionPage';
+
+// 결제 관련
+import PaymentComplete from './features/payment/PaymentComplete';
+import PaymentCancel from './features/payment/PaymentCancel';
+
+// 실제 컴포넌트
+import Profile from './features/profile/Profile';
+import AdminDashboard from './features/admin/AdminDashboard';
+import CourseCreator from './features/admin/CourseCreator';
+import InstructorDashboard from './features/instructor/InstructorDashboard';
+import ProtectedRoute from './components/common/ProtectedRoute';
+
+// 디버그 컴포넌트
+import CourseDebug from './components/debug/CourseDebug';
+import SimpleCoursesTest from './components/debug/SimpleCoursesTest';
+
 const NotFound = () => <div>404 - Page Not Found</div>;
-
-// 인증 보호 라우트 헬퍼 함수
-interface ProtectedRouteProps {
-  element: React.ReactNode;
-  isAuthenticated: boolean;
-  redirectPath?: string;
-  requiredRole?: string;
-  userRole?: string;
-}
-
-const ProtectedRoute = ({
-  element,
-  isAuthenticated,
-  redirectPath = '/login',
-  requiredRole,
-  userRole,
-}: ProtectedRouteProps) => {
-  // 인증되지 않은 경우
-  if (!isAuthenticated) {
-    return <Navigate to={redirectPath} replace />;
-  }
-
-  // 역할 확인이 필요한 경우
-  if (requiredRole && userRole !== requiredRole) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return <>{element}</>;
-};
 
 // 라우트 설정 함수
 export const createRoutes = (isAuthenticated: boolean, userRole: string): RouteObject[] => {
@@ -57,6 +43,10 @@ export const createRoutes = (isAuthenticated: boolean, userRole: string): RouteO
     },
     {
       path: '/register',
+      element: isAuthenticated ? <Navigate to="/dashboard" replace /> : <EnhancedRegister />,
+    },
+    {
+      path: '/register-old',
       element: isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />,
     },
 
@@ -64,37 +54,53 @@ export const createRoutes = (isAuthenticated: boolean, userRole: string): RouteO
     {
       path: '/dashboard',
       element: (
-        <ProtectedRoute
-          element={<Dashboard />}
-          isAuthenticated={isAuthenticated}
-        />
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
       ),
     },
     {
       path: '/courses',
-      element: (
-        <ProtectedRoute
-          element={<CourseList />}
-          isAuthenticated={isAuthenticated}
-        />
-      ),
+      element: <CourseList />, // 비회원도 강의 목록 볼 수 있음
     },
     {
       path: '/courses/:courseId',
       element: (
-        <ProtectedRoute
-          element={<CourseDetail />}
-          isAuthenticated={isAuthenticated}
-        />
+        <ProtectedRoute>
+          <CourseDetail />
+        </ProtectedRoute>
       ),
     },
     {
       path: '/profile',
       element: (
-        <ProtectedRoute
-          element={<Profile />}
-          isAuthenticated={isAuthenticated}
-        />
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: '/subscription',
+      element: (
+        <ProtectedRoute>
+          <SubscriptionPage />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: '/payment/complete',
+      element: (
+        <ProtectedRoute>
+          <PaymentComplete />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: '/payment/cancel',
+      element: (
+        <ProtectedRoute>
+          <PaymentCancel />
+        </ProtectedRoute>
       ),
     },
 
@@ -102,12 +108,9 @@ export const createRoutes = (isAuthenticated: boolean, userRole: string): RouteO
     {
       path: '/my-courses',
       element: (
-        <ProtectedRoute
-          element={<InstructorCourses />}
-          isAuthenticated={isAuthenticated}
-          requiredRole="instructor"
-          userRole={userRole}
-        />
+        <ProtectedRoute allowedRoles={['instructor', 'admin']}>
+          <InstructorDashboard />
+        </ProtectedRoute>
       ),
     },
 
@@ -115,19 +118,38 @@ export const createRoutes = (isAuthenticated: boolean, userRole: string): RouteO
     {
       path: '/admin',
       element: (
-        <ProtectedRoute
-          element={<AdminDashboard />}
-          isAuthenticated={isAuthenticated}
-          requiredRole="admin"
-          userRole={userRole}
-        />
+        <ProtectedRoute requiredRole="admin">
+          <AdminDashboard />
+        </ProtectedRoute>
       ),
+    },
+    {
+      path: '/admin/course/create',
+      element: (
+        <ProtectedRoute requiredRole="admin">
+          <CourseCreator />
+        </ProtectedRoute>
+      ),
+    },
+
+    // 디버그 라우트 (개발용)
+    {
+      path: '/debug/courses',
+      element: (
+        <ProtectedRoute>
+          <CourseDebug />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: '/debug/simple',
+      element: <SimpleCoursesTest />, // 비회원도 접근 가능한 간단 테스트
     },
 
     // 리디렉션
     {
       path: '/',
-      element: <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />,
+      element: <Navigate to={isAuthenticated ? (userRole === 'admin' ? '/admin' : '/dashboard') : '/login'} replace />,
     },
 
     // 찾을 수 없는 페이지

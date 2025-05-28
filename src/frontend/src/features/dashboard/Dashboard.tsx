@@ -2,17 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import { useAppSelector } from '../../app/store';
+import apiClient from '../../api/apiClient';
+import { supabase } from '../../lib/supabase';
 import courseImages from '../../data/courseImages';
 
-// 임시 데이터 타입 (실제 API 구현 시 대체)
+// Supabase 데이터 타입
 interface Course {
-  id: number;
+  id: string;
   title: string;
   instructor: string;
   progress: number;
   lastAccessed: string;
   imageUrl: string;
   imageAlt?: string;
+  enrollment_id?: string;
 }
 
 const Dashboard: React.FC = () => {
@@ -22,72 +25,106 @@ const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 실제 구현 시 API 호출로 대체
     const fetchDashboardData = async () => {
       try {
-        // 임시 데이터 (API 구현 시 대체)
-        setTimeout(() => {
-          setEnrolledCourses([
-            {
-              id: 1,
-              title: '파이썬 기초 프로그래밍',
-              instructor: '이강의',
-              progress: 65,
-              lastAccessed: '2025-05-18',
-              imageUrl: courseImages.python.placeholder,
-              imageAlt: courseImages.python.alt,
-            },
-            {
-              id: 2,
-              title: '데이터 분석 입문',
-              instructor: '김데이터',
-              progress: 30,
-              lastAccessed: '2025-05-17',
-              imageUrl: courseImages.dataAnalysis.placeholder,
-              imageAlt: courseImages.dataAnalysis.alt,
-            },
-            {
-              id: 3,
-              title: '웹 개발 기초',
-              instructor: '박웹',
-              progress: 15,
-              lastAccessed: '2025-05-15',
-              imageUrl: courseImages.webDev.placeholder,
-              imageAlt: courseImages.webDev.alt,
-            },
-          ]);
-
-          setRecommendedCourses([
-            {
-              id: 4,
-              title: '머신러닝 기초',
-              instructor: '최인공',
-              progress: 0,
-              lastAccessed: '',
-              imageUrl: courseImages.machineLearning.placeholder,
-              imageAlt: courseImages.machineLearning.alt,
-            },
-            {
-              id: 5,
-              title: '고급 데이터 구조',
-              instructor: '정구조',
-              progress: 0,
-              lastAccessed: '',
-              imageUrl: courseImages.dataStructure.placeholder,
-              imageAlt: courseImages.dataStructure.alt,
-            },
-          ]);
-
+        if (!user) {
           setIsLoading(false);
-        }, 800); // 로딩 시뮬레이션
+          return;
+        }
+
+        console.log('🔄 Dashboard: Fetching data from Supabase...');
+
+        // 실제 Supabase API 호출
+        const { data: enrollments, error: enrollmentError } = await supabase
+          .from('enrollments')
+          .select(`
+            id,
+            course_id,
+            enrollment_date,
+            progress,
+            courses (
+              id,
+              title,
+              description,
+              thumbnail_url,
+              instructor_id,
+              user_profiles!courses_instructor_id_fkey (
+                first_name,
+                last_name,
+                email
+              )
+            )
+          `)
+          .eq('user_id', user.id);
+        
+        if (enrollmentError) {
+          console.error('Error fetching enrollments:', enrollmentError);
+          setIsLoading(false);
+          return;
+        }
+
+        // 수강 중인 코스 데이터 변환
+        const enrolledCoursesData: Course[] = (enrollments || []).map((enrollment: any) => ({
+          id: enrollment.courses.id,
+          title: enrollment.courses.title,
+          instructor: enrollment.courses.user_profiles ? 
+            `${enrollment.courses.user_profiles.first_name || ''} ${enrollment.courses.user_profiles.last_name || ''}`.trim() ||
+            enrollment.courses.user_profiles.email : '알 수 없음',
+          progress: enrollment.progress || 0,
+          lastAccessed: new Date(enrollment.enrollment_date).toLocaleDateString(),
+          imageUrl: enrollment.courses.thumbnail_url || courseImages.python.placeholder,
+          imageAlt: enrollment.courses.title,
+          enrollment_id: enrollment.id,
+        }));
+
+        setEnrolledCourses(enrolledCoursesData);
+
+        // 추천 코스 가져오기 (모든 공개 코스 중 수강하지 않은 것들)
+        const { data: allCourses, error: coursesError } = await supabase
+          .from('courses')
+          .select(`
+            id,
+            title,
+            description,
+            thumbnail_url,
+            instructor_id,
+            user_profiles!courses_instructor_id_fkey (
+              first_name,
+              last_name,
+              email
+            )
+          `)
+          .eq('is_published', true);
+        
+        if (!coursesError && allCourses) {
+          const enrolledCourseIds = enrolledCoursesData.map(course => course.id);
+          const recommendedCoursesData: Course[] = allCourses
+            .filter((course: any) => !enrolledCourseIds.includes(course.id))
+            .slice(0, 4) // 최대 4개만
+            .map((course: any) => ({
+              id: course.id,
+              title: course.title,
+              instructor: course.user_profiles ? 
+                `${course.user_profiles.first_name || ''} ${course.user_profiles.last_name || ''}`.trim() ||
+                course.user_profiles.email : '알 수 없음',
+              progress: 0,
+              lastAccessed: '',
+              imageUrl: course.thumbnail_url || courseImages.webDev.placeholder,
+              imageAlt: course.title,
+            }));
+
+          setRecommendedCourses(recommendedCoursesData);
+        }
+
+        setIsLoading(false);
       } catch (error) {
-        console.error('Error fetching dashboard data', error);
+        console.error('Error fetching dashboard data:', error);
         setIsLoading(false);
       }
     };
 
     fetchDashboardData();
-  }, []);
+  }, [user]);
 
   // 진행률 표시 컴포넌트
   const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => (
@@ -159,7 +196,7 @@ const Dashboard: React.FC = () => {
         {/* 환영 메시지 */}
         <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg p-6 mb-8">
           <h1 className="text-2xl font-bold mb-2">
-            안녕하세요, {user?.firstName || '학습자'}님!
+            안녕하세요, {user?.first_name || '학습자'}님!
           </h1>
           <p>오늘도 AI-LMS에서 즐거운 학습 되세요.</p>
         </div>

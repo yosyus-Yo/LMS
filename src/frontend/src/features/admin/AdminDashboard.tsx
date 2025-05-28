@@ -1,226 +1,177 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAppSelector } from '../../app/store';
 import Layout from '../../components/common/Layout';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, Title, BarElement } from 'chart.js';
-import { Pie, Line, Bar } from 'react-chartjs-2';
+import Button from '../../components/common/Button';
+import apiClient from '../../api/apiClient';
 
-// Chart.js 등록
-ChartJS.register(
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title
-);
-
-// 임시 데이터 타입 (실제 API 구현 시 대체)
-interface UserSummary {
+interface DashboardStats {
   totalUsers: number;
-  activeUsers: number;
-  newUsers: number;
-  usersByRole: {
-    student: number;
-    instructor: number;
-    admin: number;
-  };
-}
-
-interface CourseSummary {
   totalCourses: number;
-  activeCourses: number;
-  completionRate: number;
-  categoryCounts: {
-    [key: string]: number;
-  };
-  recentCourses: {
-    id: number;
-    title: string;
-    enrollments: number;
-    instructor: string;
-  }[];
+  totalEnrollments: number;
+  totalRevenue: number;
+  recentUsers: User[];
+  recentCourses: Course[];
+  recentPayments: Payment[];
 }
 
-interface ActivitySummary {
-  dailyLogins: {
-    date: string;
-    count: number;
-  }[];
-  mostActiveHours: {
-    hour: number;
-    count: number;
-  }[];
-  courseEngagement: {
-    courseName: string;
-    engagementScore: number;
-  }[];
+interface User {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  date_joined: string;
+  is_active: boolean;
+}
+
+interface Course {
+  id: number;
+  title: string;
+  instructor: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  status: string;
+  enrollment_count: number;
+  created_at: string;
+}
+
+interface Payment {
+  id: number;
+  user: {
+    email: string;
+    first_name: string;
+    last_name: string;
+  };
+  amount: string;
+  status: string;
+  payment_type: string;
+  requested_at: string;
 }
 
 const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [userSummary, setUserSummary] = useState<UserSummary | null>(null);
-  const [courseSummary, setCourseSummary] = useState<CourseSummary | null>(null);
-  const [activitySummary, setActivitySummary] = useState<ActivitySummary | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'courses' | 'payments'>('overview');
+
+  // 관리자 권한 확인
+  useEffect(() => {
+    if (!isAuthenticated || !user || user.role !== 'admin') {
+      alert('관리자 권한이 필요합니다.');
+      navigate('/login');
+      return;
+    }
+  }, [isAuthenticated, user, navigate]);
 
   useEffect(() => {
-    // 실제 구현 시 API 호출로 대체
-    const fetchAdminData = async () => {
-      try {
-        // 임시 데이터 (API 구현 시 대체)
-        setTimeout(() => {
-          // 사용자 데이터
-          setUserSummary({
-            totalUsers: 1250,
-            activeUsers: 820,
-            newUsers: 45,
-            usersByRole: {
-              student: 1150,
-              instructor: 85,
-              admin: 15,
-            },
-          });
+    if (isAuthenticated && user && user.role === 'admin') {
+      fetchDashboardData();
+    }
+  }, [isAuthenticated, user]);
 
-          // 강의 데이터
-          setCourseSummary({
-            totalCourses: 75,
-            activeCourses: 68,
-            completionRate: 62,
-            categoryCounts: {
-              '프로그래밍': 32,
-              '데이터 과학': 18,
-              '웹 개발': 15,
-              '인공지능': 10,
-            },
-            recentCourses: [
-              { id: 1, title: '파이썬 기초 프로그래밍', enrollments: 120, instructor: '이강의' },
-              { id: 2, title: '데이터 분석 입문', enrollments: 85, instructor: '김데이터' },
-              { id: 3, title: '웹 개발 기초', enrollments: 150, instructor: '박웹' },
-              { id: 4, title: '머신러닝 기초', enrollments: 92, instructor: '최인공' },
-              { id: 5, title: '고급 데이터 구조', enrollments: 65, instructor: '정구조' },
-            ],
-          });
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // TODO: Supabase API로 대시보드 데이터 가져오기 구현 필요
+      console.log('Admin dashboard temporarily disabled for migration');
+      
+      // 임시 더미 데이터
+      const users: User[] = [];
+      const courses: Course[] = [];
+      const payments: Payment[] = [];
 
-          // 활동 데이터
-          setActivitySummary({
-            dailyLogins: [
-              { date: '2025-05-10', count: 120 },
-              { date: '2025-05-11', count: 145 },
-              { date: '2025-05-12', count: 160 },
-              { date: '2025-05-13', count: 130 },
-              { date: '2025-05-14', count: 170 },
-              { date: '2025-05-15', count: 185 },
-              { date: '2025-05-16', count: 210 },
-              { date: '2025-05-17', count: 195 },
-              { date: '2025-05-18', count: 180 },
-              { date: '2025-05-19', count: 220 },
-            ],
-            mostActiveHours: [
-              { hour: 9, count: 85 },
-              { hour: 10, count: 92 },
-              { hour: 11, count: 78 },
-              { hour: 12, count: 65 },
-              { hour: 13, count: 70 },
-              { hour: 14, count: 88 },
-              { hour: 15, count: 95 },
-              { hour: 16, count: 110 },
-              { hour: 17, count: 105 },
-              { hour: 18, count: 120 },
-              { hour: 19, count: 135 },
-              { hour: 20, count: 125 },
-              { hour: 21, count: 95 },
-              { hour: 22, count: 80 },
-            ],
-            courseEngagement: [
-              { courseName: '파이썬 기초 프로그래밍', engagementScore: 85 },
-              { courseName: '데이터 분석 입문', engagementScore: 72 },
-              { courseName: '웹 개발 기초', engagementScore: 78 },
-              { courseName: '머신러닝 기초', engagementScore: 90 },
-              { courseName: '고급 데이터 구조', engagementScore: 65 },
-            ],
-          });
+      // 통계 계산
+      const totalRevenue = payments
+        .filter((p: Payment) => p.status === 'completed')
+        .reduce((sum: number, p: Payment) => sum + parseFloat(p.amount), 0);
 
-          setIsLoading(false);
-        }, 800); // 로딩 시뮬레이션
-      } catch (error) {
-        console.error('Error fetching admin data', error);
-        setIsLoading(false);
+      const totalEnrollments = courses.reduce((sum: number, c: Course) => sum + (c.enrollment_count || 0), 0);
+
+      setStats({
+        totalUsers: users.length,
+        totalCourses: courses.length,
+        totalEnrollments,
+        totalRevenue,
+        recentUsers: users.slice(0, 5),
+        recentCourses: courses.slice(0, 5),
+        recentPayments: payments.slice(0, 5)
+      });
+    } catch (error) {
+      console.error('대시보드 데이터 조회 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('ko-KR', {
+      style: 'currency',
+      currency: 'KRW'
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const getStatusBadge = (status: string | boolean, type: 'user' | 'course' | 'payment') => {
+    let className = '';
+    let text = '';
+
+    if (type === 'user') {
+      const isActive = status === true || status === 'true';
+      className = isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+      text = isActive ? '활성' : '비활성';
+    } else if (type === 'course') {
+      switch (status) {
+        case 'published':
+          className = 'bg-green-100 text-green-800';
+          text = '게시됨';
+          break;
+        case 'draft':
+          className = 'bg-yellow-100 text-yellow-800';
+          text = '초안';
+          break;
+        default:
+          className = 'bg-gray-100 text-gray-800';
+          text = status.toString();
       }
-    };
+    } else if (type === 'payment') {
+      switch (status) {
+        case 'completed':
+          className = 'bg-green-100 text-green-800';
+          text = '완료';
+          break;
+        case 'pending':
+          className = 'bg-yellow-100 text-yellow-800';
+          text = '대기';
+          break;
+        case 'failed':
+          className = 'bg-red-100 text-red-800';
+          text = '실패';
+          break;
+        default:
+          className = 'bg-gray-100 text-gray-800';
+          text = status.toString();
+      }
+    }
 
-    fetchAdminData();
-  }, []);
-
-  // 차트 데이터 생성
-  const userRoleChartData = {
-    labels: ['학생', '강사', '관리자'],
-    datasets: [
-      {
-        data: userSummary ? [userSummary.usersByRole.student, userSummary.usersByRole.instructor, userSummary.usersByRole.admin] : [],
-        backgroundColor: ['#4F46E5', '#10B981', '#F59E0B'],
-        borderColor: ['#4338CA', '#059669', '#D97706'],
-        borderWidth: 1,
-      },
-    ],
+    return (
+      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${className}`}>
+        {text}
+      </span>
+    );
   };
 
-  const courseCategoryChartData = {
-    labels: courseSummary ? Object.keys(courseSummary.categoryCounts) : [],
-    datasets: [
-      {
-        label: '강의 수',
-        data: courseSummary ? Object.values(courseSummary.categoryCounts) : [],
-        backgroundColor: ['#4F46E5', '#10B981', '#F59E0B', '#EC4899'],
-        borderColor: ['#4338CA', '#059669', '#D97706', '#DB2777'],
-        borderWidth: 1,
-      },
-    ],
-  };
-
-  const loginActivityChartData = {
-    labels: activitySummary ? activitySummary.dailyLogins.map(item => item.date.substring(5)) : [],
-    datasets: [
-      {
-        label: '일일 로그인 수',
-        data: activitySummary ? activitySummary.dailyLogins.map(item => item.count) : [],
-        borderColor: '#4F46E5',
-        backgroundColor: 'rgba(79, 70, 229, 0.1)',
-        tension: 0.4,
-        fill: true,
-      },
-    ],
-  };
-
-  const hourlyActivityChartData = {
-    labels: activitySummary ? activitySummary.mostActiveHours.map(item => `${item.hour}시`) : [],
-    datasets: [
-      {
-        label: '시간대별 활동',
-        data: activitySummary ? activitySummary.mostActiveHours.map(item => item.count) : [],
-        backgroundColor: 'rgba(79, 70, 229, 0.7)',
-        borderColor: '#4F46E5',
-        borderWidth: 1,
-      },
-    ],
-  };
-
-  const courseEngagementChartData = {
-    labels: activitySummary ? activitySummary.courseEngagement.map(item => item.courseName) : [],
-    datasets: [
-      {
-        label: '참여도 점수',
-        data: activitySummary ? activitySummary.courseEngagement.map(item => item.engagementScore) : [],
-        backgroundColor: 'rgba(16, 185, 129, 0.7)',
-        borderColor: '#10B981',
-        borderWidth: 1,
-      },
-    ],
-  };
-
-  // 로딩 상태 표시
   if (isLoading) {
     return (
       <Layout>
@@ -233,474 +184,279 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <Layout>
-      <div>
-        <h1 className="text-2xl font-bold mb-6">관리자 대시보드</h1>
-
-        {/* 탭 메뉴 */}
-        <div className="bg-white shadow-md rounded-lg mb-6">
-          <div className="flex border-b">
-            <button
-              className={`px-4 py-3 text-sm font-medium ${
-                activeTab === 'overview'
-                  ? 'border-b-2 border-indigo-500 text-indigo-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('overview')}
+      <div className="space-y-6">
+        {/* 헤더 */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">관리자 대시보드</h1>
+          <div className="flex space-x-2">
+            <Link to="/admin/course/create">
+              <Button variant="primary">
+                새 강의 만들기
+              </Button>
+            </Link>
+            <Button
+              variant="secondary"
+              onClick={() => window.open('/admin/', '_blank')}
             >
-              개요
-            </button>
-            <button
-              className={`px-4 py-3 text-sm font-medium ${
-                activeTab === 'users'
-                  ? 'border-b-2 border-indigo-500 text-indigo-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('users')}
+              Django Admin
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={fetchDashboardData}
             >
-              사용자
-            </button>
-            <button
-              className={`px-4 py-3 text-sm font-medium ${
-                activeTab === 'courses'
-                  ? 'border-b-2 border-indigo-500 text-indigo-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('courses')}
-            >
-              강의
-            </button>
-            <button
-              className={`px-4 py-3 text-sm font-medium ${
-                activeTab === 'activity'
-                  ? 'border-b-2 border-indigo-500 text-indigo-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('activity')}
-            >
-              활동
-            </button>
+              새로고침
+            </Button>
           </div>
         </div>
 
-        {/* 개요 탭 */}
-        {activeTab === 'overview' && (
-          <div>
-            {/* 개요 통계 카드 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-gray-500 text-sm">총 사용자</p>
-                    <p className="text-2xl font-bold">{userSummary?.totalUsers}</p>
-                  </div>
-                  <div className="bg-indigo-100 p-3 rounded-full">
-                    <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-green-600">
-                  + {userSummary?.newUsers} 지난 주 대비
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-gray-500 text-sm">총 강의</p>
-                    <p className="text-2xl font-bold">{courseSummary?.totalCourses}</p>
-                  </div>
-                  <div className="bg-green-100 p-3 rounded-full">
-                    <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-green-600">
-                  {courseSummary?.activeCourses} 활성 강의
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-gray-500 text-sm">강의 완료율</p>
-                    <p className="text-2xl font-bold">{courseSummary?.completionRate}%</p>
-                  </div>
-                  <div className="bg-yellow-100 p-3 rounded-full">
-                    <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-yellow-600">
-                  평균 완료율
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-gray-500 text-sm">활성 사용자</p>
-                    <p className="text-2xl font-bold">{userSummary?.activeUsers}</p>
-                  </div>
-                  <div className="bg-purple-100 p-3 rounded-full">
-                    <svg className="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-purple-600">
-                  {((userSummary?.activeUsers || 0) / (userSummary?.totalUsers || 1) * 100).toFixed(1)}% 활성률
-                </div>
-              </div>
-            </div>
-
-            {/* 차트 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold mb-4">사용자 역할 분포</h2>
-                <div className="h-64">
-                  <Pie data={userRoleChartData} options={{ responsive: true, maintainAspectRatio: false }} />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold mb-4">카테고리별 강의 수</h2>
-                <div className="h-64">
-                  <Pie data={courseCategoryChartData} options={{ responsive: true, maintainAspectRatio: false }} />
-                </div>
-              </div>
-            </div>
-
-            {/* 최근 활동 */}
+        {/* 통계 카드 */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">일일 로그인 활동</h2>
-              <div className="h-80">
-                <Line 
-                  data={loginActivityChartData} 
-                  options={{ 
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    scales: {
-                      y: {
-                        beginAtZero: true
-                      }
-                    }
-                  }} 
-                />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">전체 사용자</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
+                </div>
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">전체 강의</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalCourses}</p>
+                </div>
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">전체 수강</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalEnrollments}</p>
+                </div>
+                <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">총 수익</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalRevenue)}</p>
+                </div>
+                <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* 사용자 탭 */}
-        {activeTab === 'users' && (
-          <div>
-            <div className="bg-white rounded-lg shadow mb-6">
-              <div className="p-6">
-                <h2 className="text-lg font-semibold mb-4">사용자 통계</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-gray-50 p-4 rounded">
-                    <p className="text-gray-500 text-sm">총 사용자</p>
-                    <p className="text-2xl font-bold">{userSummary?.totalUsers}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded">
-                    <p className="text-gray-500 text-sm">활성 사용자</p>
-                    <p className="text-2xl font-bold">{userSummary?.activeUsers}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded">
-                    <p className="text-gray-500 text-sm">신규 사용자 (지난 주)</p>
-                    <p className="text-2xl font-bold">{userSummary?.newUsers}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+        {/* 탭 네비게이션 */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            {[
+              { id: 'overview', name: '개요' },
+              { id: 'users', name: '사용자' },
+              { id: 'courses', name: '강의' },
+              { id: 'payments', name: '결제' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === tab.id
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {tab.name}
+              </button>
+            ))}
+          </nav>
+        </div>
 
-            <div className="bg-white rounded-lg shadow mb-6">
+        {/* 탭 컨텐츠 */}
+        {stats && (
+          <div className="bg-white rounded-lg shadow">
+            {activeTab === 'overview' && (
               <div className="p-6">
-                <h2 className="text-lg font-semibold mb-4">사용자 역할 분석</h2>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">시스템 개요</h3>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div>
-                    <div className="h-64">
-                      <Pie data={userRoleChartData} options={{ responsive: true, maintainAspectRatio: false }} />
-                    </div>
+                    <h4 className="text-md font-medium text-gray-700 mb-2">최근 활동</h4>
+                    <ul className="space-y-2">
+                      <li className="text-sm text-gray-600">• 새로운 사용자 {stats.recentUsers.length}명 가입</li>
+                      <li className="text-sm text-gray-600">• 새로운 강의 {stats.recentCourses.length}개 등록</li>
+                      <li className="text-sm text-gray-600">• 최근 결제 {stats.recentPayments.length}건 처리</li>
+                    </ul>
                   </div>
                   <div>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <div className="w-4 h-4 bg-indigo-500 rounded-full mr-2"></div>
-                          <span>학생</span>
-                        </div>
-                        <div>
-                          <span className="font-medium">{userSummary?.usersByRole.student}</span>
-                          <span className="text-gray-500 text-sm ml-1">
-                            ({((userSummary?.usersByRole.student || 0) / (userSummary?.totalUsers || 1) * 100).toFixed(1)}%)
-                          </span>
-                        </div>
+                    <h4 className="text-md font-medium text-gray-700 mb-2">시스템 상태</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                        <span className="text-sm text-gray-600">시스템 정상</span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <div className="w-4 h-4 bg-green-500 rounded-full mr-2"></div>
-                          <span>강사</span>
-                        </div>
-                        <div>
-                          <span className="font-medium">{userSummary?.usersByRole.instructor}</span>
-                          <span className="text-gray-500 text-sm ml-1">
-                            ({((userSummary?.usersByRole.instructor || 0) / (userSummary?.totalUsers || 1) * 100).toFixed(1)}%)
-                          </span>
-                        </div>
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                        <span className="text-sm text-gray-600">데이터베이스 연결</span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <div className="w-4 h-4 bg-yellow-500 rounded-full mr-2"></div>
-                          <span>관리자</span>
-                        </div>
-                        <div>
-                          <span className="font-medium">{userSummary?.usersByRole.admin}</span>
-                          <span className="text-gray-500 text-sm ml-1">
-                            ({((userSummary?.usersByRole.admin || 0) / (userSummary?.totalUsers || 1) * 100).toFixed(1)}%)
-                          </span>
-                        </div>
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                        <span className="text-sm text-gray-600">결제 시스템 연결</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="bg-white rounded-lg shadow">
+            {activeTab === 'users' && (
               <div className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-semibold">사용자 관리</h2>
-                  <Link
-                    to="/admin/users"
-                    className="text-indigo-600 hover:text-indigo-800 text-sm"
-                  >
-                    모든 사용자 보기
-                  </Link>
-                </div>
-                <p className="text-gray-500 mb-4">
-                  사용자를 관리하려면 사용자 관리 페이지로 이동하세요.
-                </p>
-                <Link
-                  to="/admin/users"
-                  className="inline-block bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-                >
-                  사용자 관리
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 강의 탭 */}
-        {activeTab === 'courses' && (
-          <div>
-            <div className="bg-white rounded-lg shadow mb-6">
-              <div className="p-6">
-                <h2 className="text-lg font-semibold mb-4">강의 통계</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-gray-50 p-4 rounded">
-                    <p className="text-gray-500 text-sm">총 강의 수</p>
-                    <p className="text-2xl font-bold">{courseSummary?.totalCourses}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded">
-                    <p className="text-gray-500 text-sm">활성 강의</p>
-                    <p className="text-2xl font-bold">{courseSummary?.activeCourses}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded">
-                    <p className="text-gray-500 text-sm">평균 완료율</p>
-                    <p className="text-2xl font-bold">{courseSummary?.completionRate}%</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow mb-6">
-              <div className="p-6">
-                <h2 className="text-lg font-semibold mb-4">카테고리별 강의</h2>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div>
-                    <div className="h-64">
-                      <Pie data={courseCategoryChartData} options={{ responsive: true, maintainAspectRatio: false }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="space-y-4">
-                      {courseSummary && Object.keys(courseSummary.categoryCounts).map((category, index) => {
-                        const colors = ['bg-indigo-500', 'bg-green-500', 'bg-yellow-500', 'bg-pink-500'];
-                        return (
-                          <div key={category} className="flex justify-between items-center">
-                            <div className="flex items-center">
-                              <div className={`w-4 h-4 ${colors[index % colors.length]} rounded-full mr-2`}></div>
-                              <span>{category}</span>
-                            </div>
-                            <div>
-                              <span className="font-medium">{courseSummary.categoryCounts[category]}</span>
-                              <span className="text-gray-500 text-sm ml-1">
-                                ({((courseSummary.categoryCounts[category] / courseSummary.totalCourses) * 100).toFixed(1)}%)
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6">
-                <h2 className="text-lg font-semibold mb-4">최근 강의</h2>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">최근 가입 사용자</h3>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          강의명
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          강사
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          수강 인원
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          액션
-                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사용자</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">역할</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">가입일</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {courseSummary?.recentCourses.map((course) => (
-                        <tr key={course.id}>
+                      {stats.recentUsers.map((user) => (
+                        <tr key={user.id}>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{course.title}</div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {user.first_name} {user.last_name}
+                              </div>
+                              <div className="text-sm text-gray-500">{user.email}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {user.role === 'admin' ? '관리자' : user.role === 'instructor' ? '강사' : '학생'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(user.date_joined)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">{course.instructor}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">{course.enrollments}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <Link to={`/courses/${course.id}`} className="text-indigo-600 hover:text-indigo-900 mr-3">
-                              보기
-                            </Link>
-                            <Link to={`/admin/courses/${course.id}/edit`} className="text-green-600 hover:text-green-900">
-                              편집
-                            </Link>
+                            {getStatusBadge(user.is_active, 'user')}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <div className="mt-4 text-right">
-                  <Link
-                    to="/admin/courses"
-                    className="text-indigo-600 hover:text-indigo-800 text-sm"
-                  >
-                    모든 강의 보기 →
-                  </Link>
-                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* 활동 탭 */}
-        {activeTab === 'activity' && (
-          <div>
-            <div className="bg-white rounded-lg shadow mb-6">
+            {activeTab === 'courses' && (
               <div className="p-6">
-                <h2 className="text-lg font-semibold mb-4">일일 로그인 활동</h2>
-                <div className="h-80">
-                  <Line 
-                    data={loginActivityChartData} 
-                    options={{ 
-                      responsive: true, 
-                      maintainAspectRatio: false,
-                      scales: {
-                        y: {
-                          beginAtZero: true
-                        }
-                      }
-                    }} 
-                  />
+                <h3 className="text-lg font-medium text-gray-900 mb-4">최근 등록 강의</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">강의명</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">강사</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">수강생</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">등록일</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {stats.recentCourses.map((course) => (
+                        <tr key={course.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{course.title}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {course.instructor.first_name} {course.instructor.last_name}
+                            </div>
+                            <div className="text-sm text-gray-500">{course.instructor.email}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {course.enrollment_count}명
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getStatusBadge(course.status, 'course')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(course.created_at)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <div className="bg-white rounded-lg shadow">
-                <div className="p-6">
-                  <h2 className="text-lg font-semibold mb-4">시간대별 활동</h2>
-                  <div className="h-80">
-                    <Bar 
-                      data={hourlyActivityChartData} 
-                      options={{ 
-                        responsive: true, 
-                        maintainAspectRatio: false,
-                        scales: {
-                          y: {
-                            beginAtZero: true
-                          }
-                        }
-                      }} 
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow">
-                <div className="p-6">
-                  <h2 className="text-lg font-semibold mb-4">강의별 참여도</h2>
-                  <div className="h-80">
-                    <Bar 
-                      data={courseEngagementChartData} 
-                      options={{ 
-                        responsive: true, 
-                        maintainAspectRatio: false,
-                        indexAxis: 'y',
-                        scales: {
-                          x: {
-                            beginAtZero: true,
-                            max: 100
-                          }
-                        }
-                      }} 
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow">
+            {activeTab === 'payments' && (
               <div className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-semibold">활동 로그</h2>
-                  <Link
-                    to="/admin/logs"
-                    className="text-indigo-600 hover:text-indigo-800 text-sm"
-                  >
-                    모든 로그 보기
-                  </Link>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">최근 결제 내역</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사용자</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">결제 유형</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">금액</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">결제일</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {stats.recentPayments.map((payment) => (
+                        <tr key={payment.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {payment.user.first_name} {payment.user.last_name}
+                            </div>
+                            <div className="text-sm text-gray-500">{payment.user.email}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {payment.payment_type === 'subscription' ? '구독' : payment.payment_type === 'course' ? '강의' : '기타'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(parseFloat(payment.amount))}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getStatusBadge(payment.status, 'payment')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(payment.requested_at)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <p className="text-gray-500 mb-4">
-                  상세한 활동 로그를 확인하려면 활동 로그 페이지로 이동하세요.
-                </p>
-                <Link
-                  to="/admin/logs"
-                  className="inline-block bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-                >
-                  활동 로그 보기
-                </Link>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

@@ -25,13 +25,15 @@ const Header: React.FC = () => {
 
         {/* 네비게이션 메뉴 */}
         <nav className="hidden md:flex space-x-6">
+          {/* 강의 목록은 모든 사용자(비회원 포함)가 볼 수 있음 */}
+          <Link to="/courses" className="text-gray-700 hover:text-indigo-600">
+            강의
+          </Link>
+          
           {isAuthenticated ? (
             <>
               <Link to="/dashboard" className="text-gray-700 hover:text-indigo-600">
                 대시보드
-              </Link>
-              <Link to="/courses" className="text-gray-700 hover:text-indigo-600">
-                강의
               </Link>
               {user?.role === 'instructor' && (
                 <Link to="/my-courses" className="text-gray-700 hover:text-indigo-600">
@@ -42,6 +44,17 @@ const Header: React.FC = () => {
                 <Link to="/admin" className="text-gray-700 hover:text-indigo-600">
                   관리자
                 </Link>
+              )}
+              {/* 개발 환경에서만 디버그 링크 표시 */}
+              {process.env.NODE_ENV === 'development' && (
+                <>
+                  <Link to="/debug/courses" className="text-orange-600 hover:text-orange-800 text-sm">
+                    🐛 디버그
+                  </Link>
+                  <Link to="/debug/simple" className="text-red-600 hover:text-red-800 text-sm">
+                    🧪 테스트
+                  </Link>
+                </>
               )}
             </>
           ) : (
@@ -59,6 +72,12 @@ const Header: React.FC = () => {
         {/* 사용자 메뉴 */}
         {isAuthenticated && (
           <div className="flex items-center space-x-4">
+            <Link 
+              to="/subscription" 
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              구독
+            </Link>
             <Link to="/profile" className="text-gray-700 hover:text-indigo-600">
               프로필
             </Link>
