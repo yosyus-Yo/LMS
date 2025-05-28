@@ -28,7 +28,8 @@
       "Bash(npm restart)",
       "Bash(timeout 10s npm start)",
       "Bash(npx tsc:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": []
   }

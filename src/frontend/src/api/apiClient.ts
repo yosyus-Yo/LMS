@@ -66,6 +66,7 @@ const apiClient = {
         throw new Error('이미 사용 중인 이메일입니다.')
       }
       
+      // Supabase Auth에 회원가입
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -74,17 +75,39 @@ const apiClient = {
             first_name: firstName,
             last_name: lastName,
             role: role || 'student',
-            phone_number: additionalInfo?.phone_number,
-            address: additionalInfo?.address,
-            organization: additionalInfo?.organization,
-            job_title: additionalInfo?.job_title,
-            bio: additionalInfo?.bio,
           }
         }
       })
       
       if (error) {
         throw new Error(error.message)
+      }
+      
+      // 회원가입 성공 후 user_profiles 테이블에 프로필 데이터 삽입
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: data.user.id,
+            email: email,
+            first_name: firstName,
+            last_name: lastName,
+            role: role || 'student',
+            phone_number: additionalInfo?.phone_number,
+            address: additionalInfo?.address,
+            organization: additionalInfo?.organization,
+            job_title: additionalInfo?.job_title,
+            bio: additionalInfo?.bio,
+            is_active: true
+          })
+        
+        if (profileError) {
+          console.error('프로필 생성 실패:', profileError)
+          // 인증 사용자는 생성되었지만 프로필 생성에 실패한 경우
+          // 나중에 로그인 시 프로필이 자동 생성되도록 처리할 수 있음
+        } else {
+          console.log('✅ 사용자 프로필 생성 성공')
+        }
       }
       
       return {
@@ -324,6 +347,38 @@ const apiClient = {
     }
   },
 
+  // 주차/챕터 관련 API (localStorage 사용)
+  weeks: {
+    async saveWeeks(courseId: string, weeks: any[]) {
+      try {
+        // localStorage에 주차 데이터 저장 (임시 해결책)
+        const weeksKey = `course_weeks_${courseId}`;
+        localStorage.setItem(weeksKey, JSON.stringify(weeks));
+        
+        console.log('주차 데이터 localStorage에 저장:', weeks);
+        return { data: weeks };
+      } catch (error) {
+        console.error('주차 저장 실패:', error);
+        throw error;
+      }
+    },
+
+    async getWeeks(courseId: string) {
+      try {
+        // localStorage에서 주차 데이터 불러오기
+        const weeksKey = `course_weeks_${courseId}`;
+        const storedWeeks = localStorage.getItem(weeksKey);
+        const weeks = storedWeeks ? JSON.parse(storedWeeks) : [];
+        
+        console.log('주차 데이터 localStorage에서 불러옴:', weeks);
+        return { data: weeks };
+      } catch (error) {
+        console.error('주차 데이터 불러오기 실패:', error);
+        return { data: [] };
+      }
+    }
+  },
+
   // 수강등록 관련 API
   enrollments: {
     async getUserEnrollments(userId?: string) {
@@ -387,6 +442,50 @@ const apiClient = {
       }
       
       return { data }
+    },
+
+    async getCourseStudents(courseId: string) {
+      try {
+        const { data, error } = await supabase
+          .from('enrollments')
+          .select(`
+            id,
+            enrollment_date,
+            status,
+            progress,
+            completed_chapters,
+            last_accessed_at,
+            user:user_profiles!enrollments_user_id_fkey(
+              id,
+              email,
+              first_name,
+              last_name
+            )
+          `)
+          .eq('course_id', courseId)
+          .order('enrollment_date', { ascending: false });
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        // 데이터 변환
+        const students = data?.map((enrollment: any) => ({
+          id: enrollment.user?.id || '',
+          email: enrollment.user?.email || '',
+          first_name: enrollment.user?.first_name || '',
+          last_name: enrollment.user?.last_name || '',
+          enrollment_date: enrollment.enrollment_date,
+          progress: enrollment.progress || 0,
+          last_activity: enrollment.last_accessed_at || enrollment.enrollment_date,
+          completed_chapters: enrollment.completed_chapters || []
+        })) || [];
+
+        return { data: students };
+      } catch (error) {
+        console.error('수강생 목록 조회 실패:', error);
+        throw error;
+      }
     }
   },
 

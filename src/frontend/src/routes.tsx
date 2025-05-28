@@ -12,6 +12,7 @@ import Dashboard from './features/dashboard/Dashboard';
 // 강의 관련
 import CourseList from './features/courses/CourseList';
 import CourseDetail from './features/courses/CourseDetail';
+import CourseIntroduction from './features/courses/CourseIntroduction';
 
 // 구독 관련
 import SubscriptionPage from './features/subscription/SubscriptionPage';
@@ -23,8 +24,9 @@ import PaymentCancel from './features/payment/PaymentCancel';
 // 실제 컴포넌트
 import Profile from './features/profile/Profile';
 import AdminDashboard from './features/admin/AdminDashboard';
-import CourseCreator from './features/admin/CourseCreator';
+import AdminCourseCreator from './features/admin/CourseCreator';
 import InstructorDashboard from './features/instructor/InstructorDashboard';
+import CourseCreator from './features/instructor/CourseCreator';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
 // 디버그 컴포넌트
@@ -65,9 +67,13 @@ export const createRoutes = (isAuthenticated: boolean, userRole: string): RouteO
     },
     {
       path: '/courses/:courseId',
+      element: <CourseDetail />, // 비회원도 강의 상세 페이지 볼 수 있음
+    },
+    {
+      path: '/courses/:courseId/learn',
       element: (
         <ProtectedRoute>
-          <CourseDetail />
+          <CourseIntroduction />
         </ProtectedRoute>
       ),
     },
@@ -113,6 +119,22 @@ export const createRoutes = (isAuthenticated: boolean, userRole: string): RouteO
         </ProtectedRoute>
       ),
     },
+    {
+      path: '/instructor/courses/create',
+      element: (
+        <ProtectedRoute allowedRoles={['instructor', 'admin']}>
+          <CourseCreator />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: '/instructor/courses/:courseId/edit',
+      element: (
+        <ProtectedRoute allowedRoles={['instructor', 'admin']}>
+          <CourseCreator />
+        </ProtectedRoute>
+      ),
+    },
 
     // 관리자 전용 라우트
     {
@@ -127,7 +149,7 @@ export const createRoutes = (isAuthenticated: boolean, userRole: string): RouteO
       path: '/admin/course/create',
       element: (
         <ProtectedRoute requiredRole="admin">
-          <CourseCreator />
+          <AdminCourseCreator />
         </ProtectedRoute>
       ),
     },

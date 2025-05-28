@@ -14,6 +14,9 @@ interface Course {
   title: string;
   instructor: string;
   description: string;
+  introduction?: string; // 소개페이지 내용 (누구나 볼 수 있음)
+  content?: string; // 실제 강의 내용 (수강생만 볼 수 있음)
+  video_url?: string; // 강의 동영상 URL
   level: 'beginner' | 'intermediate' | 'advanced';
   duration: string;
   rating: number;
@@ -262,6 +265,9 @@ const CourseList: React.FC = () => {
       const updateData = {
         title: updatedCourse.title,
         description: updatedCourse.description,
+        introduction: updatedCourse.introduction,
+        content: updatedCourse.content,
+        video_url: updatedCourse.video_url,
         level: updatedCourse.level,
         status: updatedCourse.status,
         price: updatedCourse.price,
