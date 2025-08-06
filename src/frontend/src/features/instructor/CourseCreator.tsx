@@ -127,7 +127,7 @@ const CourseCreator: React.FC = () => {
       const courseData = response.data;
       
       // 주차 데이터 불러오기
-      const weeksResponse = await apiClient.weeks.getWeeks(courseId!);
+      const weeksResponse = await apiClient.modules.getWeeks(courseId!);
       courseData.weeks = weeksResponse.data;
       
       setCourse(courseData);
@@ -177,10 +177,11 @@ const CourseCreator: React.FC = () => {
         
         // 주차 데이터 저장
         if (course.weeks && course.weeks.length > 0) {
-          await apiClient.weeks.saveWeeks(courseId, course.weeks);
+          await apiClient.modules.saveWeeks(courseId, course.weeks);
         }
         
         alert('강의가 수정되었습니다.');
+        navigate('/my-courses');
       } else {
         // 새 강의 생성
         const result = await apiClient.courses.create(courseData);
@@ -188,7 +189,7 @@ const CourseCreator: React.FC = () => {
         
         // 주차 데이터 저장
         if (course.weeks && course.weeks.length > 0) {
-          await apiClient.weeks.saveWeeks(newCourseId, course.weeks);
+          await apiClient.modules.saveWeeks(newCourseId, course.weeks);
         }
         
         // 강의 생성 성공 시 임시 파일을 정식 파일로 전환 (추적에서 제거)
@@ -197,7 +198,7 @@ const CourseCreator: React.FC = () => {
         });
         
         alert('강의가 생성되었습니다.');
-        navigate(`/instructor/courses/${newCourseId}/edit`);
+        navigate('/my-courses');
       }
     } catch (error) {
       console.error('강의 저장 실패:', error);
@@ -335,7 +336,7 @@ const CourseCreator: React.FC = () => {
     // 편집 모드에서는 실시간으로 주차 데이터 저장
     if (isEditMode && courseId) {
       try {
-        await apiClient.weeks.saveWeeks(courseId, updatedWeeks);
+        await apiClient.modules.saveWeeks(courseId, updatedWeeks);
         console.log('새 주차가 저장되었습니다.');
       } catch (error) {
         console.error('새 주차 저장 실패:', error);
@@ -358,7 +359,7 @@ const CourseCreator: React.FC = () => {
         const updatedWeeks = course.weeks?.map(week => 
           week.id === updatedWeek.id ? updatedWeek : week
         ) || [];
-        await apiClient.weeks.saveWeeks(courseId, updatedWeeks);
+        await apiClient.modules.saveWeeks(courseId, updatedWeeks);
         console.log('주차 데이터가 자동 저장되었습니다.');
       } catch (error) {
         console.error('주차 자동 저장 실패:', error);
@@ -394,7 +395,7 @@ const CourseCreator: React.FC = () => {
           const updatedWeeks = course.weeks?.map(w => 
             w.id === weekId ? updatedWeek : w
           ) || [];
-          await apiClient.weeks.saveWeeks(courseId, updatedWeeks);
+          await apiClient.modules.saveWeeks(courseId, updatedWeeks);
           console.log('주차 데이터가 자동 저장되었습니다.');
         } catch (error) {
           console.error('주차 자동 저장 실패:', error);
@@ -409,7 +410,7 @@ const CourseCreator: React.FC = () => {
   };
 
   const handleDeleteWeek = async (weekId: string) => {
-    if (confirm('이 주차를 삭제하시겠습니까?')) {
+    if (window.confirm('이 주차를 삭제하시겠습니까?')) {
       const updatedWeeks = course.weeks?.filter(week => week.id !== weekId) || [];
       
       setCourse(prev => ({
@@ -424,7 +425,7 @@ const CourseCreator: React.FC = () => {
       // 편집 모드에서는 실시간으로 주차 데이터 저장
       if (isEditMode && courseId) {
         try {
-          await apiClient.weeks.saveWeeks(courseId, updatedWeeks);
+          await apiClient.modules.saveWeeks(courseId, updatedWeeks);
           console.log('주차 삭제가 저장되었습니다.');
         } catch (error) {
           console.error('주차 삭제 저장 실패:', error);
@@ -712,6 +713,7 @@ const CourseCreator: React.FC = () => {
                   onVideoUpload={handleVideoUpload}
                   uploading={uploading}
                   uploadProgress={uploadProgress}
+                  onBackToIntro={() => setSelectedWeek(null)}
                 />
               ) : (
                 /* 강의 소개 편집 화면 */
@@ -783,6 +785,7 @@ interface WeekEditorProps {
   onVideoUpload: (file: File, weekId: string) => Promise<void>;
   uploading: boolean;
   uploadProgress: number;
+  onBackToIntro: () => void;
 }
 
 const WeekEditor: React.FC<WeekEditorProps> = ({
@@ -790,7 +793,8 @@ const WeekEditor: React.FC<WeekEditorProps> = ({
   onChange,
   onVideoUpload,
   uploading,
-  uploadProgress
+  uploadProgress,
+  onBackToIntro
 }) => {
   const [editableWeek, setEditableWeek] = useState(week);
 
@@ -827,9 +831,17 @@ const WeekEditor: React.FC<WeekEditorProps> = ({
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">
-          {week.week_number === 0 ? '0주차 (강의 소개) 편집' : `${week.week_number}주차 편집`}
-        </h2>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={onBackToIntro}
+            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+          >
+            ← 강의 소개로 돌아가기
+          </button>
+          <h2 className="text-xl font-semibold">
+            {week.week_number === 0 ? '0주차 (강의 소개) 편집' : `${week.week_number}주차 편집`}
+          </h2>
+        </div>
         <div className="flex items-center space-x-2">
           <input
             type="checkbox"

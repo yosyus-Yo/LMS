@@ -45,7 +45,7 @@ const CourseDebug: React.FC = () => {
         role: user.user_metadata?.role || 'unknown'
       } : null;
       
-      // 3. 전체 강의 조회 (모든 status 포함)
+      // 3. 전체 강의 조회 (모든 status 포함, 외래키 없이)
       const { data: allCourses, error: coursesError } = await supabase
         .from('courses')
         .select(`
@@ -54,8 +54,7 @@ const CourseDebug: React.FC = () => {
           status,
           is_published,
           created_at,
-          instructor_id,
-          instructor:user_profiles!courses_instructor_id_fkey(first_name, last_name, email)
+          instructor_id
         `)
         .order('created_at', { ascending: false });
       

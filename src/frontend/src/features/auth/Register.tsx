@@ -153,262 +153,186 @@ const Register: React.FC = () => {
   
   return (
     <Layout>
-      <div className="max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-6 text-center">회원가입</h1>
-        
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input
-              id="firstName"
-              name="firstName"
-              type="text"
-              label="이름"
-              value={formData.firstName}
-              onChange={handleChange}
-              placeholder="이름"
-              error={formErrors.firstName}
-              fullWidth
-            />
-            
-            <Input
-              id="lastName"
-              name="lastName"
-              type="text"
-              label="성"
-              value={formData.lastName}
-              onChange={handleChange}
-              placeholder="성"
-              error={formErrors.lastName}
-              fullWidth
-            />
+      <div className="min-h-screen flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-sm space-y-6">
+          {/* 로고와 제목 */}
+          <div className="text-center">
+            <div className="text-4xl mb-4">✨</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">회원가입</h1>
+            <p className="text-gray-600">AI-LMS에 참여하세요</p>
           </div>
           
-          
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            label="이메일"
-            value={formData.email}
-            onChange={handleChange}
-            placeholder="example@example.com"
-            error={formErrors.email}
-            fullWidth
-          />
-          
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            label="비밀번호"
-            value={formData.password}
-            onChange={handleChange}
-            placeholder="비밀번호"
-            error={formErrors.password}
-            fullWidth
-          />
-          
-          <Input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            label="비밀번호 확인"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            placeholder="비밀번호 확인"
-            error={formErrors.confirmPassword}
-            fullWidth
-          />
-          
-          {/* 역할 선택 */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              가입 유형을 선택해주세요 *
-            </label>
-            
-            <div className="space-y-3">
-              {/* 학생 선택 */}
-              <div
-                className={`relative flex cursor-pointer rounded-lg border p-4 transition-all ${
-                  formData.role === 'student'
-                    ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600'
-                    : 'border-gray-300 bg-white hover:bg-gray-50'
-                }`}
-                onClick={() => setFormData({ ...formData, role: 'student' })}
-              >
-                <div className="flex h-5 items-center">
-                  <input
-                    id="role-student"
-                    name="role"
-                    type="radio"
-                    value="student"
-                    checked={formData.role === 'student'}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                  />
-                </div>
-                <div className="ml-3 flex-1">
-                  <div className="flex items-center">
-                    <span className="text-2xl mr-2">🎓</span>
-                    <label htmlFor="role-student" className="text-base font-medium text-gray-900 cursor-pointer">
-                      학생으로 가입
-                    </label>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    강의를 수강하고 학습할 수 있습니다. 개인정보 수정 권한을 가집니다.
-                  </p>
-                </div>
-              </div>
-
-              {/* 강사 선택 */}
-              <div
-                className={`relative flex cursor-pointer rounded-lg border p-4 transition-all ${
-                  formData.role === 'instructor'
-                    ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600'
-                    : 'border-gray-300 bg-white hover:bg-gray-50'
-                }`}
-                onClick={() => setFormData({ ...formData, role: 'instructor' })}
-              >
-                <div className="flex h-5 items-center">
-                  <input
-                    id="role-instructor"
-                    name="role"
-                    type="radio"
-                    value="instructor"
-                    checked={formData.role === 'instructor'}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                  />
-                </div>
-                <div className="ml-3 flex-1">
-                  <div className="flex items-center">
-                    <span className="text-2xl mr-2">👨‍🏫</span>
-                    <label htmlFor="role-instructor" className="text-base font-medium text-gray-900 cursor-pointer">
-                      강사로 가입
-                    </label>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    강의를 생성하고 수강생을 관리할 수 있습니다. (수강생 이름, 이메일만 조회 가능)
-                  </p>
-                </div>
-              </div>
+          {/* 에러 메시지 */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {error}
             </div>
-          </div>
+          )}
           
-          {/* 추가 정보 섹션 */}
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">선택 정보</h3>
-            <p className="text-sm text-gray-600 mb-4">아래 정보는 선택사항이며, 나중에 프로필에서 수정할 수 있습니다.</p>
-            
-            <div className="space-y-4">
-              <Input
-                id="phoneNumber"
-                name="phoneNumber"
-                type="tel"
-                label="전화번호"
-                value={formData.phoneNumber}
-                onChange={handleChange}
-                placeholder="010-1234-5678"
-                error={formErrors.phoneNumber}
-                fullWidth
-              />
-              
-              <Input
-                id="address"
-                name="address"
-                type="text"
-                label="주소"
-                value={formData.address}
-                onChange={handleChange}
-                placeholder="서울시 강남구..."
-                fullWidth
-              />
-              
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* 회원가입 폼 */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* 이름 입력 */}
+              <div className="grid grid-cols-2 gap-3">
                 <Input
-                  id="organization"
-                  name="organization"
+                  id="firstName"
+                  name="firstName"
                   type="text"
-                  label="소속 기관"
-                  value={formData.organization}
+                  label="👤 이름"
+                  value={formData.firstName}
                   onChange={handleChange}
-                  placeholder="회사명 또는 학교명"
+                  placeholder="이름"
+                  error={formErrors.firstName}
                   fullWidth
                 />
                 
                 <Input
-                  id="jobTitle"
-                  name="jobTitle"
+                  id="lastName"
+                  name="lastName"
                   type="text"
-                  label="직책"
-                  value={formData.jobTitle}
+                  label="👤 성"
+                  value={formData.lastName}
                   onChange={handleChange}
-                  placeholder="개발자, 학생 등"
+                  placeholder="성"
+                  error={formErrors.lastName}
                   fullWidth
                 />
               </div>
               
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                label="📧 이메일"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="example@example.com"
+                error={formErrors.email}
+                fullWidth
+              />
+              
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                label="🔒 비밀번호"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="최소 6자 이상"
+                error={formErrors.password}
+                fullWidth
+              />
+              
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                label="🔒 비밀번호 확인"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="비밀번호를 다시 입력하세요"
+                error={formErrors.confirmPassword}
+                fullWidth
+              />
+              
+              {/* 역할 선택 - 모바일 최적화 */}
               <div>
-                <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">
-                  자기소개
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  🎯 가입 유형을 선택해주세요
                 </label>
-                <textarea
-                  id="bio"
-                  name="bio"
-                  rows={3}
-                  value={formData.bio}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="간단한 자기소개를 입력해주세요..."
-                />
+                
+                <div className="space-y-3">
+                  {/* 학생 선택 */}
+                  <div
+                    className={`relative flex cursor-pointer rounded-lg border p-3 transition-all ${
+                      formData.role === 'student'
+                        ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600'
+                        : 'border-gray-300 bg-white hover:bg-gray-50'
+                    }`}
+                    onClick={() => setFormData({ ...formData, role: 'student' })}
+                  >
+                    <div className="flex h-5 items-center">
+                      <input
+                        id="role-student"
+                        name="role"
+                        type="radio"
+                        value="student"
+                        checked={formData.role === 'student'}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                      />
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center">
+                        <span className="text-xl mr-2">🎓</span>
+                        <label htmlFor="role-student" className="text-sm font-medium text-gray-900 cursor-pointer">
+                          학생으로 가입
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        강의를 수강하고 학습할 수 있습니다
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 강사 선택 */}
+                  <div
+                    className={`relative flex cursor-pointer rounded-lg border p-3 transition-all ${
+                      formData.role === 'instructor'
+                        ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600'
+                        : 'border-gray-300 bg-white hover:bg-gray-50'
+                    }`}
+                    onClick={() => setFormData({ ...formData, role: 'instructor' })}
+                  >
+                    <div className="flex h-5 items-center">
+                      <input
+                        id="role-instructor"
+                        name="role"
+                        type="radio"
+                        value="instructor"
+                        checked={formData.role === 'instructor'}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                      />
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center">
+                        <span className="text-xl mr-2">👨‍🏫</span>
+                        <label htmlFor="role-instructor" className="text-sm font-medium text-gray-900 cursor-pointer">
+                          강사로 가입
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        강의를 생성하고 수강생을 관리할 수 있습니다
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+              
+              {/* 회원가입 버튼 */}
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isLoading}
+                className="w-full py-3 text-lg font-medium"
+              >
+                {isLoading ? '회원가입 중...' : '🎉 회원가입 완료'}
+              </Button>
+            </form>
           </div>
           
-          <div className="flex items-center">
-            <input
-              id="terms"
-              name="terms"
-              type="checkbox"
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              required
-            />
-            <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
-              <span>
-                <Link to="/terms" className="text-indigo-600 hover:text-indigo-500">
-                  이용약관
-                </Link>
-                {' '}및{' '}
-                <Link to="/privacy" className="text-indigo-600 hover:text-indigo-500">
-                  개인정보처리방침
-                </Link>
-                에 동의합니다
-              </span>
-            </label>
-          </div>
-          
-          <Button
-            type="submit"
-            variant="primary"
-            isLoading={isLoading}
-            fullWidth
-          >
-            회원가입
-          </Button>
-          
-          <div className="text-center mt-4">
-            <span className="text-gray-600">이미 계정이 있으신가요?</span>{' '}
-            <Link to="/login" className="text-indigo-600 hover:text-indigo-500">
-              로그인
+          {/* 로그인 링크 */}
+          <div className="text-center">
+            <div className="text-sm text-gray-600 mb-2">이미 계정이 있으신가요?</div>
+            <Link 
+              to="/login" 
+              className="inline-block w-full py-3 px-4 bg-gray-100 text-gray-800 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            >
+              🔑 로그인하기
             </Link>
           </div>
-        </form>
+        </div>
       </div>
     </Layout>
   );

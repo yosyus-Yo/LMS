@@ -30,6 +30,11 @@ const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/community" className="text-gray-300 hover:text-white">
+                  커뮤니티
+                </Link>
+              </li>
+              <li>
                 <Link to="/profile" className="text-gray-300 hover:text-white">
                   내 프로필
                 </Link>

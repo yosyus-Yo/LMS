@@ -12,7 +12,8 @@ interface Student {
   last_name: string;
   enrollment_date: string;
   progress: number;
-  last_activity: string;
+  last_activity: string; // completion_date 또는 enrollment_date
+  completed_chapters?: string[];
 }
 
 interface Course {
@@ -50,6 +51,8 @@ const InstructorDashboard: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   
   // 강의 관리 상태
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
@@ -215,6 +218,22 @@ const InstructorDashboard: React.FC = () => {
     loadStudentsForCourse(course.id);
   };
 
+  const handleMigrateData = async (courseId: string) => {
+    try {
+      console.log('🔄 데이터 마이그레이션 시작:', courseId);
+      const result = await apiClient.modules.migrateFromLocalStorage(courseId);
+      
+      if (result.success) {
+        alert(result.message);
+      } else {
+        alert(result.message);
+      }
+    } catch (error) {
+      console.error('❌ 마이그레이션 실패:', error);
+      alert('마이그레이션 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleManageWeeks = (course: Course) => {
     setSelectedCourseForWeeks(course);
     setIsWeekModalOpen(true);
@@ -243,6 +262,68 @@ const InstructorDashboard: React.FC = () => {
     if (progress >= 50) return 'bg-yellow-500';
     return 'bg-red-500';
   };
+
+  const getStudentStatus = (progress: number, lastActivity: string) => {
+    const daysSinceActivity = Math.floor((Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (progress >= 100) {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">완료</span>;
+    } else if (progress >= 80) {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">거의 완료</span>;
+    } else if (progress >= 50) {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">진행중</span>;
+    } else {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">시작</span>;
+    }
+  };
+
+  const exportStudentData = () => {
+    if (!selectedCourse || filteredStudents.length === 0) {
+      alert('내보낼 수강생 데이터가 없습니다.');
+      return;
+    }
+
+    const csvData = [
+      ['이름', '이메일', '등록일', '진도율', '완료 챕터 수', '최근 활동'],
+      ...filteredStudents.map(student => [
+        `${student.first_name} ${student.last_name}`,
+        student.email,
+        formatDate(student.enrollment_date),
+        `${student.progress}%`,
+        student.completed_chapters?.length || 0,
+        formatDateTime(student.last_activity)
+      ])
+    ];
+
+    const csvContent = csvData.map(row => row.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${selectedCourse.title}_수강생_목록_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  // 수강생 필터링
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = searchTerm === '' || 
+      student.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'active' && student.progress >= 50 && student.progress < 100) ||
+      (statusFilter === 'completed' && student.progress >= 100) ||
+      (statusFilter === 'inactive' && student.progress < 50);
+
+    return matchesSearch && matchesStatus;
+  });
 
   if (loading) {
     return (
@@ -330,6 +411,18 @@ const InstructorDashboard: React.FC = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            handleMigrateData(course.id);
+                          }}
+                          className="p-1 text-gray-400 hover:text-green-600 rounded"
+                          title="localStorage 데이터 마이그레이션"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             handleDeleteCourse(course.id);
                           }}
                           className="p-1 text-gray-400 hover:text-red-600 rounded"
@@ -389,13 +482,113 @@ const InstructorDashboard: React.FC = () => {
         {selectedCourse && (
           <div className="bg-white shadow rounded-lg">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">
-                수강생 관리 - {selectedCourse.title}
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                개인정보 보호를 위해 이름과 이메일만 표시됩니다.
-              </p>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900">
+                    수강생 관리 - {selectedCourse.title}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    총 {students.length}명의 수강생이 등록되어 있습니다. {searchTerm || statusFilter !== 'all' ? `(${filteredStudents.length}명 표시)` : ''}
+                  </p>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    출력
+                  </button>
+                  <button
+                    onClick={() => exportStudentData()}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    내보내기
+                  </button>
+                </div>
+              </div>
             </div>
+            
+            {/* 수강생 통계 */}
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{students.length}</div>
+                  <div className="text-sm text-gray-500">총 수강생</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {students.filter(s => s.progress >= 80).length}
+                  </div>
+                  <div className="text-sm text-gray-500">완주 근접 (80%+)</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-600">
+                    {students.filter(s => s.progress >= 50 && s.progress < 80).length}
+                  </div>
+                  <div className="text-sm text-gray-500">진행 중 (50-79%)</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">
+                    {students.filter(s => s.progress < 50).length}
+                  </div>
+                  <div className="text-sm text-gray-500">시작 단계 (&lt;50%)</div>
+                </div>
+              </div>
+            </div>
+            
+            {/* 검색 및 필터 */}
+            {students.length > 0 && (
+              <div className="px-6 py-4 border-b border-gray-200 bg-white">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        placeholder="수강생 이름 또는 이메일로 검색..."
+                      />
+                    </div>
+                  </div>
+                  <div className="sm:w-48">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    >
+                      <option value="all">모든 상태</option>
+                      <option value="active">진행중 (50-99%)</option>
+                      <option value="completed">완료 (100%)</option>
+                      <option value="inactive">시작 단계 (&lt;50%)</option>
+                    </select>
+                  </div>
+                  {(searchTerm || statusFilter !== 'all') && (
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setStatusFilter('all');
+                      }}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      초기화
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <div className="px-6 py-4">
               {studentsLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -416,12 +609,18 @@ const InstructorDashboard: React.FC = () => {
                           진도율
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          최근 활동
+                          완료 챕터
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          완료일/등록일
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          상태
                         </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {students.map((student) => (
+                      {filteredStudents.map((student) => (
                         <tr key={student.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
@@ -445,19 +644,27 @@ const InstructorDashboard: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
+                              <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                                 <div
                                   className={`h-2 rounded-full ${getProgressColor(student.progress)}`}
                                   style={{ width: `${student.progress}%` }}
                                 ></div>
                               </div>
-                              <span className="text-sm text-gray-900 font-medium">
+                              <span className="text-sm text-gray-900 font-medium min-w-[3rem]">
                                 {student.progress}%
                               </span>
                             </div>
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {student.completed_chapters?.length || 0}개 완료
+                            </span>
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDateTime(student.last_activity)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getStudentStatus(student.progress, student.last_activity)}
                           </td>
                         </tr>
                       ))}
@@ -468,9 +675,18 @@ const InstructorDashboard: React.FC = () => {
                 <div className="text-center py-8">
                   <div className="text-4xl mb-4">👥</div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">아직 수강생이 없습니다</h3>
-                  <p className="text-gray-500">
+                  <p className="text-gray-500 mb-4">
                     강의가 공개되면 수강생들이 등록할 수 있습니다.
                   </p>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <p>💡 <strong>팁:</strong> 강의를 더 많은 사람들에게 알리는 방법:</p>
+                    <ul className="list-disc list-inside space-y-1 text-left max-w-md mx-auto">
+                      <li>강의 제목과 설명을 구체적으로 작성하세요</li>
+                      <li>적절한 카테고리와 난이도를 설정하세요</li>
+                      <li>강의 미리보기나 소개 영상을 추가하세요</li>
+                      <li>정기적으로 강의 내용을 업데이트하세요</li>
+                    </ul>
+                  </div>
                 </div>
               )}
             </div>
@@ -876,7 +1092,7 @@ const WeekManagementModal: React.FC<WeekManagementModalProps> = ({ course, onClo
   };
 
   const handleDeleteWeek = async (weekId: string) => {
-    if (confirm('이 주차를 삭제하시겠습니까?')) {
+    if (window.confirm('이 주차를 삭제하시겠습니까?')) {
       setWeeks(prev => prev.filter(w => w.id !== weekId));
     }
   };

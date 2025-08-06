@@ -166,7 +166,7 @@ const EnhancedRegister: React.FC = () => {
     return phoneRegex.test(phone.replace(/[^0-9]/g, ''));
   };
 
-  // 이메일 중복 확인 (실제 데이터베이스 조회)
+  // 이메일 중복 확인 (실제 계정 생성 없이)
   const checkEmailDuplicate = async () => {
     if (!formData.email) {
       setFormErrors(prev => ({ ...prev, email: '이메일을 입력해주세요' }));
@@ -181,54 +181,30 @@ const EnhancedRegister: React.FC = () => {
     console.log('🔍 이메일 중복 확인 시작:', formData.email);
     setIsLoading(true);
     
-    // 타임아웃 설정 (10초)
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('요청 시간 초과 (10초)')), 10000);
-    });
-
     try {
-      // user_profiles 테이블에서 이메일 확인 (타임아웃 적용)
+      // user_profiles 테이블에서 직접 조회 시도 (RLS가 비활성화되어 있으므로 가능)
       console.log('🔍 user_profiles 테이블에서 이메일 확인 중...');
       
-      const queryPromise = supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select('id, email')
         .eq('email', formData.email.toLowerCase())
         .limit(1);
 
-      const result = await Promise.race([
-        queryPromise,
-        timeoutPromise
-      ]);
-      
-      const { data: profileData, error: profileError } = result;
-
-      console.log('📊 중복 확인 결과:', { profileData, profileError });
-
       if (profileError) {
-        console.error('❌ 데이터베이스 조회 에러:', profileError);
+        console.warn('⚠️ user_profiles 조회 실패:', profileError.message);
         
-        // RLS 정책 문제나 권한 문제인 경우
-        if (profileError.code === '42501' || 
-            profileError.code === 'PGRST301' ||
-            profileError.message.includes('permission denied') ||
-            profileError.message.includes('RLS')) {
-          
-          console.warn('⚠️ RLS 정책 문제 감지, 회원가입 시 실제 중복 확인 진행');
-          
-          // RLS 문제가 있으면 경고하지만 진행 허용
-          setEmailDuplicateCheck({
-            checked: true,
-            isAvailable: true,
-            message: '이메일을 확인했습니다 (제한적 확인)',
-          });
-          setFormErrors(prev => ({ ...prev, email: '' }));
-          
-          // RLS 문제를 사용자에게 알림
-          alert('데이터베이스 권한 설정으로 인해 제한적 확인만 가능합니다.\n회원가입 시 실제 중복 확인이 진행됩니다.');
-          
-        } else {
-          throw new Error(`데이터베이스 조회 실패: ${profileError.message}`);
+        // RLS 오류 등으로 조회가 실패해도 진행 허용 (회원가입 시 실제 확인)
+        setEmailDuplicateCheck({
+          checked: true,
+          isAvailable: true,
+          message: '이메일을 확인했습니다 (제한적 확인)',
+        });
+        setFormErrors(prev => ({ ...prev, email: '' }));
+        
+        if (profileError.message.includes('infinite recursion') ||
+            profileError.message.includes('policy')) {
+          alert('현재 이메일 중복 확인에 제한이 있습니다.\n회원가입 시 정확한 중복 확인이 진행됩니다.');
         }
       } else if (profileData && profileData.length > 0) {
         // 이메일이 이미 존재
@@ -249,28 +225,19 @@ const EnhancedRegister: React.FC = () => {
         });
         setFormErrors(prev => ({ ...prev, email: '' }));
       }
+      
     } catch (error: any) {
       console.error('❌ 이메일 중복 확인 실패:', error);
       
-      if (error.message.includes('시간 초과')) {
-        setFormErrors(prev => ({ ...prev, email: '네트워크 연결이 느립니다. 회원가입 시 실제 확인이 진행됩니다.' }));
-        
-        // 타임아웃이어도 진행 허용
-        setEmailDuplicateCheck({
-          checked: true,
-          isAvailable: true,
-          message: '이메일을 확인했습니다 (네트워크 지연)',
-        });
-      } else {
-        setFormErrors(prev => ({ ...prev, email: `이메일 확인 중 오류: ${error.message}` }));
-        
-        // 중복 확인 상태 초기화
-        setEmailDuplicateCheck({
-          checked: false,
-          isAvailable: false,
-          message: '',
-        });
-      }
+      // 오류 발생 시에도 진행 허용 (회원가입 시 실제 확인)
+      setEmailDuplicateCheck({
+        checked: true,
+        isAvailable: true,
+        message: '이메일을 확인했습니다 (제한적 확인)',
+      });
+      setFormErrors(prev => ({ ...prev, email: '' }));
+      
+      console.warn('⚠️ 이메일 중복 확인 중 오류 발생, 회원가입 시 실제 확인 진행');
     }
     
     setIsLoading(false);
@@ -431,7 +398,7 @@ const EnhancedRegister: React.FC = () => {
         role: formData.role,
       });
 
-      // Supabase 회원가입 시도
+      // Supabase Auth 회원가입
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -446,7 +413,7 @@ const EnhancedRegister: React.FC = () => {
       });
 
       if (error) {
-        console.error('❌ 회원가입 실패:', error);
+        console.error('❌ Supabase Auth 회원가입 실패:', error);
         
         // 구체적인 에러 메시지 처리
         let errorMessage = '회원가입에 실패했습니다.';
@@ -467,26 +434,98 @@ const EnhancedRegister: React.FC = () => {
         return;
       }
 
-      console.log('✅ 회원가입 성공:', data);
+      console.log('✅ Supabase Auth 회원가입 성공:', data);
       
+      // user_profiles 테이블에 프로필 데이터 저장
       if (data.user) {
-        // 회원가입 성공 처리
-        let successMessage = '';
+        try {
+          console.log('🔄 사용자 프로필 생성 중...');
+          console.log('📋 프로필 데이터:', {
+            id: data.user.id,
+            email: formData.email,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            role: formData.role,
+            phone_number: formData.phone
+          });
+          
+          // 먼저 이미 프로필이 존재하는지 확인
+          const { data: existingProfile } = await supabase
+            .from('user_profiles')
+            .select('id')
+            .eq('id', data.user.id)
+            .single();
+          
+          if (existingProfile) {
+            console.log('ℹ️ 이미 프로필이 존재합니다. 업데이트를 시도합니다.');
+            
+            // 기존 프로필 업데이트
+            const { error: updateError } = await supabase
+              .from('user_profiles')
+              .update({
+                email: formData.email.toLowerCase(),
+                first_name: formData.firstName?.trim() || null,
+                last_name: formData.lastName?.trim() || null,
+                role: formData.role,
+                phone_number: formData.phone?.trim() || null,
+                is_active: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', data.user.id);
+            
+            if (updateError) {
+              throw updateError;
+            }
+            console.log('✅ 기존 프로필 업데이트 성공');
+          } else {
+            // 새 프로필 생성
+            const { error: insertError } = await supabase
+              .from('user_profiles')
+              .insert({
+                id: data.user.id,
+                email: formData.email.toLowerCase(),
+                first_name: formData.firstName?.trim() || null,
+                last_name: formData.lastName?.trim() || null,
+                role: formData.role,
+                phone_number: formData.phone?.trim() || null,
+                is_active: true
+              });
+            
+            if (insertError) {
+              throw insertError;
+            }
+            console.log('✅ 새 프로필 생성 성공');
+          }
+        } catch (profileError: any) {
+          console.error('❌ 사용자 프로필 처리 실패:', profileError);
+          console.error('❌ 프로필 오류 상세:', {
+            code: profileError.code,
+            message: profileError.message,
+            details: profileError.details,
+            hint: profileError.hint
+          });
+          
+          // 프로필 생성 실패 시에도 회원가입은 성공했으므로 사용자에게 알림
+          let errorMsg = profileError.message || '알 수 없는 오류';
+          if (profileError.code) {
+            errorMsg += ` (코드: ${profileError.code})`;
+          }
+          
+          alert(`회원가입은 성공했지만 프로필 생성 중 오류가 발생했습니다.\n\n오류: ${errorMsg}\n\n로그인 후 프로필을 다시 설정해주세요.`);
+        }
+        
+        // 회원가입 성공 메시지
+        let successMessage = `회원가입이 완료되었습니다!\n\n` +
+          `이메일: ${formData.email}\n` +
+          `역할: ${formData.role === 'student' ? '학생' : '강사'}\n` +
+          `이름: ${formData.lastName} ${formData.firstName}\n`;
         
         if (data.user.email_confirmed_at) {
           // 이메일이 이미 확인된 경우 (즉시 로그인 가능)
-          successMessage = `회원가입이 완료되었습니다!\n\n` +
-            `이메일: ${formData.email}\n` +
-            `역할: ${formData.role === 'student' ? '학생' : '강사'}\n` +
-            `이름: ${formData.lastName} ${formData.firstName}\n\n` +
-            `바로 로그인하실 수 있습니다.`;
+          successMessage += `\n바로 로그인하실 수 있습니다.`;
         } else {
           // 이메일 확인이 필요한 경우
-          successMessage = `회원가입이 완료되었습니다!\n\n` +
-            `이메일: ${formData.email}\n` +
-            `역할: ${formData.role === 'student' ? '학생' : '강사'}\n` +
-            `이름: ${formData.lastName} ${formData.firstName}\n\n` +
-            `이메일로 발송된 확인 링크를 클릭한 후 로그인하세요.`;
+          successMessage += `\n이메일로 발송된 확인 링크를 클릭한 후 로그인하세요.`;
         }
         
         alert(successMessage);

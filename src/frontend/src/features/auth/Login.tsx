@@ -109,115 +109,132 @@ const Login: React.FC = () => {
 
   return (
     <Layout>
-      <div className="max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-6 text-center">로그인</h1>
-        
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
+      <div className="min-h-screen flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-sm space-y-6">
+          {/* 로고와 제목 */}
+          <div className="text-center">
+            <div className="text-4xl mb-4">🎓</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">AI-LMS</h1>
+            <p className="text-gray-600">로그인하여 학습을 시작하세요</p>
           </div>
-        )}
-        
-        {/* 개발 모드용 테스트 계정 */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <h3 className="text-sm font-medium text-blue-900 mb-2">개발 모드 - 테스트 계정</h3>
-            <div className="space-y-2 text-sm">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('admin@test.com');
-                  setPassword('test123');
-                }}
-                className="block w-full text-left px-2 py-1 hover:bg-blue-100 rounded"
-              >
-                👑 관리자: admin@test.com / test123
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('instructor@test.com');
-                  setPassword('test123');
-                }}
-                className="block w-full text-left px-2 py-1 hover:bg-blue-100 rounded"
-              >
-                👨‍🏫 강사: instructor@test.com / test123
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('student@test.com');
-                  setPassword('test123');
-                }}
-                className="block w-full text-left px-2 py-1 hover:bg-blue-100 rounded"
-              >
-                🎓 학생: student@test.com / test123
-              </button>
+          
+          {/* 에러 메시지 */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {error}
             </div>
-          </div>
-        )}
+          )}
+          
+          {/* 개발 모드용 테스트 계정 */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-blue-900 mb-3">🧪 테스트 계정</h3>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('admin123@admin.com');
+                    setPassword('admin123');
+                  }}
+                  className="w-full text-left px-3 py-2 bg-white hover:bg-blue-100 rounded-md text-sm border"
+                >
+                  👑 관리자 계정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('test@test.com');
+                    setPassword('Test1234');
+                  }}
+                  className="w-full text-left px-3 py-2 bg-white hover:bg-blue-100 rounded-md text-sm border"
+                >
+                  👨‍🏫 강사 계정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('sioxgap409@naver.com');
+                    setPassword('Hoon1234');
+                  }}
+                  className="w-full text-left px-3 py-2 bg-white hover:bg-blue-100 rounded-md text-sm border"
+                >
+                  🎓 학생 계정
+                </button>
+              </div>
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            label="이메일"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="이메일을 입력하세요"
-            error={formErrors.email}
-            fullWidth
-          />
-          
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            label="비밀번호"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="비밀번호를 입력하세요"
-            error={formErrors.password}
-            fullWidth
-          />
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          {/* 로그인 폼 */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                label="📧 이메일"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="example@email.com"
+                error={formErrors.email}
+                fullWidth
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                로그인 상태 유지
-              </label>
-            </div>
-            
-            <div className="text-sm">
-              <Link to="/forgot-password" className="text-indigo-600 hover:text-indigo-500">
-                비밀번호를 잊으셨나요?
-              </Link>
-            </div>
+              
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                label="🔒 비밀번호"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호를 입력하세요"
+                error={formErrors.password}
+                fullWidth
+              />
+              
+              {/* 체크박스와 링크 */}
+              <div className="space-y-3">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="remember-me" className="ml-3 text-sm text-gray-700">
+                    로그인 상태 유지
+                  </label>
+                </div>
+                
+                <div className="text-center">
+                  <Link to="/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-500">
+                    🤔 비밀번호를 잊으셨나요?
+                  </Link>
+                </div>
+              </div>
+              
+              {/* 로그인 버튼 */}
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isLoading}
+                className="w-full py-3 text-lg font-medium"
+              >
+                {isLoading ? '로그인 중...' : '🚀 로그인'}
+              </Button>
+            </form>
           </div>
           
-          <Button
-            type="submit"
-            variant="primary"
-            isLoading={isLoading}
-            fullWidth
-          >
-            로그인
-          </Button>
-          
-          <div className="text-center mt-4">
-            <span className="text-gray-600">계정이 없으신가요?</span>{' '}
-            <Link to="/register" className="text-indigo-600 hover:text-indigo-500">
-              회원가입
+          {/* 회원가입 링크 */}
+          <div className="text-center">
+            <div className="text-sm text-gray-600 mb-2">아직 계정이 없으신가요?</div>
+            <Link 
+              to="/register" 
+              className="inline-block w-full py-3 px-4 bg-gray-100 text-gray-800 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            >
+              ✨ 회원가입하기
             </Link>
           </div>
-        </form>
+        </div>
       </div>
     </Layout>
   );

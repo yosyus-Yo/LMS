@@ -382,55 +382,54 @@ const CourseList: React.FC = () => {
 
   return (
     <Layout>
-      <div>
-        <h1 className="text-2xl font-bold mb-6">강의 목록</h1>
+      <div className="space-y-4">
+        {/* 모바일 전용 타이틀 */}
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800">📚 강의 목록</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            {filteredCourses.length}개의 강의
+          </p>
+        </div>
 
-        {/* 검색 및 필터 */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
+        {/* 모바일 전용 검색 */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="space-y-3">
+            <div>
               <Input
                 id="search"
                 name="search"
                 type="text"
-                label="강의 검색"
+                label="🔍 강의 검색"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="강의명, 강사명, 내용으로 검색"
+                placeholder="강의명, 강사명으로 검색"
                 fullWidth
               />
             </div>
 
-            <div>
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-                카테고리
-              </label>
+            {/* 모바일 전용 필터 버튼들 */}
+            <div className="flex space-x-2 overflow-x-auto pb-2">
               <select
                 id="category"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="flex-shrink-0 px-3 py-2 text-sm rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
               >
-                <option value="">전체 카테고리</option>
+                <option value="">🏷️ 전체 카테고리</option>
                 {allCategories.map((category) => (
                   <option key={category} value={category}>
                     {category}
                   </option>
                 ))}
               </select>
-            </div>
 
-            <div>
-              <label htmlFor="level" className="block text-sm font-medium text-gray-700 mb-1">
-                레벨
-              </label>
               <select
                 id="level"
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="flex-shrink-0 px-3 py-2 text-sm rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
               >
-                <option value="">전체 레벨</option>
+                <option value="">📊 전체 레벨</option>
                 {levelOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -441,59 +440,83 @@ const CourseList: React.FC = () => {
           </div>
         </div>
 
-        {/* 강의 목록 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* 모바일 전용 강의 목록 - 세로 카드 */}
+        <div className="space-y-4">
           {filteredCourses.length > 0 ? (
             filteredCourses.map((course) => (
               <div
                 key={course.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+                className="bg-white rounded-lg shadow-md overflow-hidden"
               >
-                <img
-                  src={course.imageUrl}
-                  alt={course.imageAlt}
-                  className="w-full h-48 object-cover"
-                />
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <h2 className="text-lg font-semibold text-gray-900 line-clamp-2">
+                {/* 썸네일 이미지 */}
+                <div className="relative">
+                  <img
+                    src={course.imageUrl}
+                    alt={course.imageAlt}
+                    className="w-full h-40 object-cover"
+                  />
+                  <div className="absolute top-2 right-2 flex flex-col gap-1">
+                    {getLevelBadge(course.level)}
+                    {isAdmin && getStatusBadge(course.status)}
+                  </div>
+                  {course.is_free && (
+                    <div className="absolute top-2 left-2">
+                      <span className="bg-green-500 text-white text-xs px-2 py-1 rounded font-medium">
+                        💚 무료
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 카드 내용 */}
+                <div className="p-4">
+                  {/* 제목과 강사 */}
+                  <div className="mb-3">
+                    <h2 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2">
                       {course.title}
                     </h2>
-                    <div className="flex flex-col gap-1">
-                      {getLevelBadge(course.level)}
-                      {isAdmin && getStatusBadge(course.status)}
-                    </div>
+                    <p className="text-sm text-gray-600 flex items-center">
+                      👨‍🏫 {course.instructor}
+                    </p>
                   </div>
                   
-                  <p className="text-gray-600 text-sm mb-2">{course.instructor}</p>
-                  <p className="text-gray-700 text-sm mb-4 line-clamp-3">
+                  {/* 설명 */}
+                  <p className="text-gray-700 text-sm mb-3 line-clamp-2">
                     {course.description}
                   </p>
                   
-                  <div className="flex items-center mb-4">
-                    {renderStars(course.rating)}
-                    <span className="ml-2 text-sm text-gray-600">
-                      {course.rating.toFixed(1)} ({course.ratingCount})
-                    </span>
+                  {/* 평점과 정보 */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                      {renderStars(course.rating)}
+                      <span className="ml-2 text-sm text-gray-600">
+                        {course.rating.toFixed(1)} ({course.ratingCount})
+                      </span>
+                    </div>
+                    <span className="text-sm text-gray-500">⏱️ {course.duration}</span>
                   </div>
                   
+                  {/* 카테고리 태그 */}
                   <div className="flex flex-wrap gap-1 mb-4">
                     {course.categories.map((category) => (
                       <span
                         key={category}
-                        className="inline-block bg-gray-200 text-gray-800 text-xs px-2 py-1 rounded"
+                        className="inline-block bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded"
                       >
                         {category}
                       </span>
                     ))}
                   </div>
                   
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">{course.duration}</span>
+                  {/* 가격과 액션 버튼 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-lg font-bold text-indigo-600">
+                      {course.is_free ? '무료' : `₩${course.price.toLocaleString()}`}
+                    </div>
                     <div className="flex space-x-2">
                       <Link to={`/courses/${course.id}`}>
-                        <Button variant="primary" size="sm">
-                          자세히 보기
+                        <Button variant="primary" className="px-4 py-2 text-sm">
+                          📖 수강하기
                         </Button>
                       </Link>
                       {isAdmin && (
@@ -502,13 +525,13 @@ const CourseList: React.FC = () => {
                             onClick={() => handleEditCourse(course)}
                             className="px-2 py-1 text-xs bg-indigo-100 text-indigo-600 rounded hover:bg-indigo-200"
                           >
-                            수정
+                            ✏️
                           </button>
                           <button
                             onClick={() => handleDeleteCourse(course.id)}
                             className="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
                           >
-                            삭제
+                            🗑️
                           </button>
                         </div>
                       )}
@@ -518,38 +541,39 @@ const CourseList: React.FC = () => {
               </div>
             ))
           ) : (
-            <div className="col-span-full text-center py-12">
+            <div className="bg-white rounded-lg shadow p-6 text-center">
               {courses.length === 0 ? (
                 <div>
                   <div className="text-6xl mb-4">📚</div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">강의가 없습니다</h3>
                   <p className="text-gray-500 mb-4">
-                    Supabase 데이터베이스에 강의 데이터가 없습니다.
+                    아직 등록된 강의가 없습니다.
                   </p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
-                    <p className="text-sm text-blue-800 mb-3">
-                      💡 <strong>강의 데이터 추가 방법:</strong>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800 mb-2">
+                      💡 <strong>강의를 추가해보세요!</strong>
                     </p>
-                    <div className="text-left text-sm text-blue-700 space-y-2">
-                      <div>1. Supabase 프로젝트 대시보드에 로그인</div>
-                      <div>2. SQL Editor 또는 Table Editor 사용</div>
-                      <div>3. 다음 테이블에 데이터 추가:</div>
-                      <ul className="ml-4 space-y-1">
-                        <li>• <code>categories</code> - 강의 카테고리</li>
-                        <li>• <code>user_profiles</code> - 강사 정보</li>
-                        <li>• <code>courses</code> - 강의 정보</li>
-                      </ul>
-                      <div className="mt-2">
-                        <strong>참고:</strong> 강의 상태는 'published'로 설정해야 표시됩니다.
-                      </div>
-                    </div>
+                    <p className="text-xs text-blue-700">
+                      강사로 등록하여 새로운 강의를 만들거나<br/>
+                      관리자에게 문의해주세요.
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div>
                   <div className="text-6xl mb-4">🔍</div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">검색 결과가 없습니다</h3>
-                  <p className="text-gray-500">다른 검색 조건을 시도해보세요.</p>
+                  <p className="text-gray-500 mb-4">다른 검색 조건을 시도해보세요.</p>
+                  <button 
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedCategory('');
+                      setSelectedLevel('');
+                    }}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+                  >
+                    🔄 필터 초기화
+                  </button>
                 </div>
               )}
             </div>

@@ -57,31 +57,33 @@ interface Payment {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { user: currentUser, isAuthenticated } = useAppSelector((state) => state.auth);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'courses' | 'payments'>('overview');
   
   // 강의 관리 상태
-  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<string | null>(null);
+  
+  // 사용자 관리 상태
+  const [isUserDeleteConfirmOpen, setIsUserDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
   // 관리자 권한 확인
   useEffect(() => {
-    if (!isAuthenticated || !user || user.role !== 'admin') {
+    if (!isAuthenticated || !currentUser || currentUser.role !== 'admin') {
       alert('관리자 권한이 필요합니다.');
       navigate('/login');
       return;
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, currentUser, navigate]);
 
   useEffect(() => {
-    if (isAuthenticated && user && user.role === 'admin') {
+    if (isAuthenticated && currentUser && currentUser.role === 'admin') {
       fetchDashboardData();
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, currentUser]);
 
   const fetchDashboardData = async () => {
     try {
@@ -203,8 +205,65 @@ const AdminDashboard: React.FC = () => {
 
   // 강의 수정 핸들러
   const handleEditCourse = (course: Course) => {
-    setEditingCourse(course);
-    setIsEditModalOpen(true);
+    navigate(`/instructor/courses/${course.id}/edit`);
+  };
+
+  // 사용자 삭제 핸들러
+  const handleDeleteUser = (userId: string) => {
+    setUserToDelete(userId);
+    setIsUserDeleteConfirmOpen(true);
+  };
+
+  // 사용자 삭제 확인
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    try {
+      console.log('사용자 삭제 시작:', userToDelete);
+      
+      // 삭제 대상 사용자 정보 찾기
+      const userInfo = stats?.recentUsers.find(user => user.id === userToDelete);
+      const userName = userInfo ? `${userInfo.first_name} ${userInfo.last_name} (${userInfo.email})` : userToDelete;
+      
+      // 실제 API 호출로 사용자 삭제
+      const result = await apiClient.users.delete(userToDelete);
+      console.log('✅ 사용자 삭제 API 호출 성공:', result);
+      
+      // 상태에서 제거
+      setStats(prevStats => {
+        if (!prevStats) return null;
+        return {
+          ...prevStats,
+          recentUsers: prevStats.recentUsers.filter(user => user.id !== userToDelete),
+          totalUsers: prevStats.totalUsers - 1
+        };
+      });
+
+      // 성공 메시지 표시
+      if (result.success && result.message) {
+        alert(`✅ ${result.message}\n\n⚠️ 주의: Supabase Authentication 계정은 별도로 관리해야 합니다.\n\n📋 Supabase 대시보드 > Authentication > Users에서 해당 사용자를 수동으로 삭제하거나 비활성화하세요.`);
+      } else {
+        alert(`✅ 사용자 ${userName}의 데이터베이스 기록이 모두 삭제되었습니다.\n\n⚠️ Supabase Auth 계정은 별도 관리가 필요합니다.`);
+      }
+      
+      setIsUserDeleteConfirmOpen(false);
+      setUserToDelete(null);
+      
+      // 대시보드 데이터 새로고침
+      fetchDashboardData();
+      
+    } catch (error) {
+      console.error('❌ 사용자 삭제 실패:', error);
+      
+      let errorMessage = '사용자 삭제에 실패했습니다.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      alert(`❌ ${errorMessage}\n\n💡 문제가 지속되면 개발자 콘솔을 확인하세요.`);
+      setIsUserDeleteConfirmOpen(false);
+      setUserToDelete(null);
+    }
   };
 
   // 강의 삭제 핸들러
@@ -245,42 +304,6 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  // 강의 수정 저장
-  const handleSaveCourse = async (updatedCourse: Course) => {
-    try {
-      console.log('강의 수정 시작:', updatedCourse);
-      
-      // 실제 API 호출로 강의 수정
-      const updateData = {
-        title: updatedCourse.title,
-        status: updatedCourse.status,
-        enrollment_count: updatedCourse.enrollment_count
-      };
-      
-      const result = await apiClient.courses.update(updatedCourse.id, updateData);
-      console.log('✅ 강의 수정 성공:', result);
-      
-      // 상태에서 업데이트
-      setStats(prevStats => {
-        if (!prevStats) return null;
-        return {
-          ...prevStats,
-          recentCourses: prevStats.recentCourses.map(course => 
-            course.id === updatedCourse.id ? updatedCourse : course
-          )
-        };
-      });
-
-      alert('강의가 수정되었습니다.');
-      setIsEditModalOpen(false);
-      setEditingCourse(null);
-    } catch (error) {
-      console.error('❌ 강의 수정 실패:', error);
-      alert(`강의 수정에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-      setIsEditModalOpen(false);
-      setEditingCourse(null);
-    }
-  };
 
   const getStatusBadge = (status: string | boolean, type: 'user' | 'course' | 'payment') => {
     let className = '';
@@ -348,7 +371,7 @@ const AdminDashboard: React.FC = () => {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">관리자 대시보드</h1>
           <div className="flex space-x-2">
-            <Link to="/admin/course/create">
+            <Link to="/instructor/courses/create">
               <Button variant="primary">
                 새 강의 만들기
               </Button>
@@ -542,7 +565,20 @@ const AdminDashboard: React.FC = () => {
                               {getStatusBadge(user.is_active ?? true, 'user')}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <span className="text-gray-400">관리 기능 준비중</span>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className={`${
+                                    user.email === currentUser?.email 
+                                      ? 'text-gray-400 cursor-not-allowed' 
+                                      : 'text-red-600 hover:text-red-900'
+                                  }`}
+                                  disabled={user.email === currentUser?.email} // 현재 로그인한 사용자는 삭제할 수 없음
+                                  title={user.email === currentUser?.email ? '자기 자신은 삭제할 수 없습니다' : '사용자 삭제'}
+                                >
+                                  삭제
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -568,7 +604,7 @@ const AdminDashboard: React.FC = () => {
                       총 {stats.recentCourses.length}개 강의
                     </div>
                     <div className="flex space-x-2">
-                      <Link to="/admin/course/create">
+                      <Link to="/instructor/courses/create">
                         <Button variant="primary" size="sm">
                           새 강의 추가
                         </Button>
@@ -708,16 +744,68 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* 강의 수정 모달 */}
-        {isEditModalOpen && editingCourse && (
-          <CourseEditModal
-            course={editingCourse}
-            onSave={handleSaveCourse}
-            onClose={() => {
-              setIsEditModalOpen(false);
-              setEditingCourse(null);
-            }}
-          />
+
+        {/* 사용자 삭제 확인 모달 */}
+        {isUserDeleteConfirmOpen && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+              <div className="mt-3 text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                  <svg
+                    className="h-6 w-6 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mt-2">
+                  사용자 삭제 확인
+                </h3>
+                <div className="mt-2 px-7 py-3">
+                  <p className="text-sm text-gray-500 mb-3">
+                    이 사용자를 정말 삭제하시겠습니까? 다음 데이터가 모두 삭제됩니다:
+                  </p>
+                  <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-md text-left">
+                    <ul className="space-y-1">
+                      <li>• 사용자 프로필 정보</li>
+                      <li>• 수강신청 기록</li>
+                      <li>• 결제 기록</li>
+                      <li>• 커뮤니티 게시글 및 댓글</li>
+                    </ul>
+                  </div>
+                  <p className="text-xs text-orange-600 mt-2">
+                    ⚠️ Supabase Auth 계정은 별도로 관리해야 합니다.
+                  </p>
+                </div>
+                <div className="items-center px-4 py-3">
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => {
+                        setIsUserDeleteConfirmOpen(false);
+                        setUserToDelete(null);
+                      }}
+                      className="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={confirmDeleteUser}
+                      className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* 강의 삭제 확인 모달 */}
@@ -776,99 +864,5 @@ const AdminDashboard: React.FC = () => {
   );
 };
 
-// 강의 수정 모달 컴포넌트
-interface CourseEditModalProps {
-  course: Course;
-  onSave: (course: Course) => void;
-  onClose: () => void;
-}
-
-const CourseEditModal: React.FC<CourseEditModalProps> = ({ course, onSave, onClose }) => {
-  const [formData, setFormData] = useState({
-    title: course.title,
-    status: course.status,
-    enrollment_count: course.enrollment_count
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave({
-      ...course,
-      title: formData.title,
-      status: formData.status,
-      enrollment_count: formData.enrollment_count
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            강의 수정
-          </h3>
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                강의명
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({...formData, title: e.target.value})}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                상태
-              </label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({...formData, status: e.target.value})}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="draft">초안</option>
-                <option value="published">게시됨</option>
-                <option value="archived">보관됨</option>
-              </select>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                수강생 수
-              </label>
-              <input
-                type="number"
-                value={formData.enrollment_count}
-                onChange={(e) => setFormData({...formData, enrollment_count: parseInt(e.target.value) || 0})}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                min="0"
-              />
-            </div>
-
-            <div className="flex space-x-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              >
-                취소
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              >
-                저장
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default AdminDashboard;

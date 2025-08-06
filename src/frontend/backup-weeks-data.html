@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주차별 강의 데이터 백업</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .data-item { 
+            background: #f5f5f5; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+        button { 
+            background: #007cba; 
+            color: white; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 5px;
+        }
+        button:hover { background: #005a8b; }
+        textarea { width: 100%; height: 200px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>주차별 강의 데이터 백업 도구</h1>
+        <p>브라우저의 localStorage에 저장된 주차별 강의 데이터를 확인하고 백업할 수 있습니다.</p>
+        
+        <button onclick="checkData()">localStorage 데이터 확인</button>
+        <button onclick="exportData()">데이터 내보내기 (JSON)</button>
+        <button onclick="clearData()">localStorage 데이터 삭제</button>
+        
+        <div id="dataList"></div>
+        
+        <h3>데이터 복원</h3>
+        <p>백업한 JSON 데이터를 아래에 붙여넣고 복원 버튼을 클릭하세요:</p>
+        <textarea id="importData" placeholder="백업된 JSON 데이터를 여기에 붙여넣으세요..."></textarea>
+        <br>
+        <button onclick="importData()">데이터 복원</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function checkData() {
+            const dataList = document.getElementById('dataList');
+            const result = document.getElementById('result');
+            
+            dataList.innerHTML = '<h3>저장된 주차별 강의 데이터:</h3>';
+            result.innerHTML = '';
+            
+            let found = false;
+            
+            // localStorage에서 course_weeks_로 시작하는 모든 키 찾기
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('course_weeks_')) {
+                    found = true;
+                    const courseId = key.replace('course_weeks_', '');
+                    const data = localStorage.getItem(key);
+                    
+                    try {
+                        const weeks = JSON.parse(data);
+                        const dataItem = document.createElement('div');
+                        dataItem.className = 'data-item';
+                        dataItem.innerHTML = `
+                            <h4>강의 ID: ${courseId}</h4>
+                            <p>주차 수: ${weeks.length}개</p>
+                            <details>
+                                <summary>상세 데이터 보기</summary>
+                                <pre>${JSON.stringify(weeks, null, 2)}</pre>
+                            </details>
+                        `;
+                        dataList.appendChild(dataItem);
+                    } catch (e) {
+                        console.error('데이터 파싱 오류:', e);
+                    }
+                }
+            }
+            
+            if (!found) {
+                dataList.innerHTML += '<p>저장된 주차별 강의 데이터가 없습니다.</p>';
+            }
+        }
+        
+        function exportData() {
+            const allData = {};
+            let found = false;
+            
+            // 모든 course_weeks_ 데이터 수집
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('course_weeks_')) {
+                    found = true;
+                    const data = localStorage.getItem(key);
+                    try {
+                        allData[key] = JSON.parse(data);
+                    } catch (e) {
+                        console.error('데이터 파싱 오류:', e);
+                    }
+                }
+            }
+            
+            if (!found) {
+                alert('내보낼 데이터가 없습니다.');
+                return;
+            }
+            
+            // JSON 파일로 다운로드
+            const jsonData = JSON.stringify(allData, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `course_weeks_backup_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            document.getElementById('result').innerHTML = '<p style="color: green;">데이터를 성공적으로 내보냈습니다!</p>';
+        }
+        
+        function importData() {
+            const importDataText = document.getElementById('importData').value.trim();
+            const result = document.getElementById('result');
+            
+            if (!importDataText) {
+                result.innerHTML = '<p style="color: red;">복원할 데이터를 입력해주세요.</p>';
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(importDataText);
+                let imported = 0;
+                
+                // 각 course_weeks_ 데이터를 localStorage에 저장
+                for (const [key, value] of Object.entries(data)) {
+                    if (key.startsWith('course_weeks_')) {
+                        localStorage.setItem(key, JSON.stringify(value));
+                        imported++;
+                    }
+                }
+                
+                result.innerHTML = `<p style="color: green;">${imported}개의 강의 데이터를 성공적으로 복원했습니다!</p>`;
+                
+                // 데이터 목록 새로고침
+                checkData();
+                
+            } catch (e) {
+                result.innerHTML = '<p style="color: red;">잘못된 JSON 형식입니다. 데이터를 확인해주세요.</p>';
+                console.error('JSON 파싱 오류:', e);
+            }
+        }
+        
+        function clearData() {
+            if (!confirm('정말로 모든 주차별 강의 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                return;
+            }
+            
+            let deleted = 0;
+            const keysToDelete = [];
+            
+            // 삭제할 키 목록 수집
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('course_weeks_')) {
+                    keysToDelete.push(key);
+                }
+            }
+            
+            // 키 삭제
+            keysToDelete.forEach(key => {
+                localStorage.removeItem(key);
+                deleted++;
+            });
+            
+            document.getElementById('result').innerHTML = `<p style="color: orange;">${deleted}개의 주차별 강의 데이터가 삭제되었습니다.</p>`;
+            
+            // 데이터 목록 새로고침
+            checkData();
+        }
+        
+        // 페이지 로드 시 자동으로 데이터 확인
+        window.onload = function() {
+            checkData();
+        };
+    </script>
+</body>
+</html>

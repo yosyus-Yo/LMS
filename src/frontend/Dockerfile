@@ -1,4 +1,5 @@
-FROM node:18-alpine
+# Build stage
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
@@ -6,19 +7,48 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code
 COPY . .
 
+# Set all environment variables for build
+ARG REACT_APP_NAME=AI-LMS
+ARG REACT_APP_VERSION=1.0.0
+ARG REACT_APP_SUPABASE_URL=https://iwrutwcngkoxbtznsfkb.supabase.co
+ARG REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3cnV0d2NuZ2tveGJ0em5zZmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxNDkyODYsImV4cCI6MjA2MzcyNTI4Nn0.hC1DP_GPHslrl8Be5IIsnesSCOCov7b4qaFGALt23A8
+ARG REACT_APP_NICEPAY_CLIENT_ID=your_nicepay_client_id
+ARG REACT_APP_NICEPAY_MODE=development
+ARG REACT_APP_EMAILJS_SERVICE_ID=service_9fheut7
+ARG REACT_APP_EMAILJS_TEMPLATE_ID=template_fhhyjai
+ARG REACT_APP_EMAILJS_PUBLIC_KEY=4nNvMDfN3rKNgaDur
+ARG REACT_APP_GROQ_API_KEY
+
+ENV REACT_APP_NAME=$REACT_APP_NAME
+ENV REACT_APP_VERSION=$REACT_APP_VERSION
+ENV REACT_APP_SUPABASE_URL=$REACT_APP_SUPABASE_URL
+ENV REACT_APP_SUPABASE_ANON_KEY=$REACT_APP_SUPABASE_ANON_KEY
+ENV REACT_APP_NICEPAY_CLIENT_ID=$REACT_APP_NICEPAY_CLIENT_ID
+ENV REACT_APP_NICEPAY_MODE=$REACT_APP_NICEPAY_MODE
+ENV REACT_APP_EMAILJS_SERVICE_ID=$REACT_APP_EMAILJS_SERVICE_ID
+ENV REACT_APP_EMAILJS_TEMPLATE_ID=$REACT_APP_EMAILJS_TEMPLATE_ID
+ENV REACT_APP_EMAILJS_PUBLIC_KEY=$REACT_APP_EMAILJS_PUBLIC_KEY
+ENV REACT_APP_GROQ_API_KEY=$REACT_APP_GROQ_API_KEY
+
 # Build the app
 RUN npm run build
 
-# Install serve to run the build
-RUN npm install -g serve
+# Production stage
+FROM nginx:alpine
 
-# Expose port
-EXPOSE 3000
+# Copy nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Serve the build
-CMD ["serve", "-s", "build", "-l", "3000"]
+# Copy built app from builder stage
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import apiClient from '../../api/apiClient';
+import { supabase } from '../../lib/supabase';
 import { jwtDecode } from 'jwt-decode';
 
 // 타입 정의
@@ -124,20 +125,57 @@ export const register = createAsyncThunk(
   }
 );
 
-// 사용자 정보 가져오기 액션
+// 사용자 정보 가져오기 액션 (직접 구현으로 단순화)
 export const getUserProfile = createAsyncThunk(
   'auth/getUserProfile',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiClient.auth.getCurrentUser();
+      console.log('🔄 getUserProfile 액션 시작 (직접 구현)');
       
-      if (!response.data) {
-        return rejectWithValue('No user found');
+      // Supabase에서 직접 사용자 정보 가져오기
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error('❌ 인증 오류:', authError);
+        return rejectWithValue('인증되지 않은 사용자입니다.');
       }
       
-      return response.data;
+      console.log('✅ 인증 사용자 확인:', user.id);
+      
+      // 프로필 정보 조회 (타임아웃 처리)
+      const profilePromise = supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('프로필 조회 타임아웃')), 2000)
+      );
+      
+      const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
+      
+      if (profileError) {
+        console.warn('⚠️ 프로필 조회 실패, 기본 정보 사용:', profileError);
+        // 프로필이 없어도 기본 사용자 정보 반환
+        return {
+          id: user.id,
+          email: user.email || '',
+          first_name: user.user_metadata?.first_name || '',
+          last_name: user.user_metadata?.last_name || '',
+          role: 'student'
+        };
+      }
+      
+      console.log('✅ 프로필 조회 성공');
+      return {
+        id: user.id,
+        email: user.email || '',
+        ...profile
+      };
+      
     } catch (error: any) {
-      console.error('Profile fetch error:', error);
+      console.error('❌ Profile fetch error:', error);
       return rejectWithValue(error.message || 'Failed to fetch user profile');
     }
   }
@@ -205,6 +243,7 @@ const authSlice = createSlice({
       })
       .addCase(getUserProfile.fulfilled, (state, action: PayloadAction<User>) => {
         state.isLoading = false;
+        state.isAuthenticated = true;
         state.user = action.payload;
       })
       .addCase(getUserProfile.rejected, (state, action) => {

@@ -34,7 +34,7 @@ const Dashboard: React.FC = () => {
 
         console.log('🔄 Dashboard: Fetching data from Supabase...');
 
-        // 실제 Supabase API 호출
+        // 실제 Supabase API 호출 (외래키 없이)
         const { data: enrollments, error: enrollmentError } = await supabase
           .from('enrollments')
           .select(`
@@ -47,12 +47,7 @@ const Dashboard: React.FC = () => {
               title,
               description,
               thumbnail_url,
-              instructor_id,
-              user_profiles!courses_instructor_id_fkey (
-                first_name,
-                last_name,
-                email
-              )
+              instructor_id
             )
           `)
           .eq('user_id', user.id);
@@ -63,23 +58,40 @@ const Dashboard: React.FC = () => {
           return;
         }
 
+        // 강사 정보 별도 조회
+        const instructorIds = Array.from(new Set((enrollments || []).map((e: any) => e.courses?.instructor_id).filter(Boolean)));
+        let instructorMap = new Map();
+        
+        if (instructorIds.length > 0) {
+          const { data: instructors } = await supabase
+            .from('user_profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', instructorIds);
+          
+          if (instructors) {
+            instructorMap = new Map(instructors.map(inst => [inst.id, inst]));
+          }
+        }
+
         // 수강 중인 코스 데이터 변환
-        const enrolledCoursesData: Course[] = (enrollments || []).map((enrollment: any) => ({
-          id: enrollment.courses.id,
-          title: enrollment.courses.title,
-          instructor: enrollment.courses.user_profiles ? 
-            `${enrollment.courses.user_profiles.first_name || ''} ${enrollment.courses.user_profiles.last_name || ''}`.trim() ||
-            enrollment.courses.user_profiles.email : '알 수 없음',
-          progress: enrollment.progress || 0,
-          lastAccessed: new Date(enrollment.enrollment_date).toLocaleDateString(),
-          imageUrl: enrollment.courses.thumbnail_url || courseImages.python.placeholder,
-          imageAlt: enrollment.courses.title,
-          enrollment_id: enrollment.id,
-        }));
+        const enrolledCoursesData: Course[] = (enrollments || []).map((enrollment: any) => {
+          const instructor = instructorMap.get(enrollment.courses?.instructor_id);
+          return {
+            id: enrollment.courses.id,
+            title: enrollment.courses.title,
+            instructor: instructor ? 
+              `${instructor.first_name || ''} ${instructor.last_name || ''}`.trim() || instructor.email : '알 수 없음',
+            progress: enrollment.progress || 0,
+            lastAccessed: new Date(enrollment.enrollment_date).toLocaleDateString(),
+            imageUrl: enrollment.courses.thumbnail_url || courseImages.python.placeholder,
+            imageAlt: enrollment.courses.title,
+            enrollment_id: enrollment.id,
+          };
+        });
 
         setEnrolledCourses(enrolledCoursesData);
 
-        // 추천 코스 가져오기 (모든 공개 코스 중 수강하지 않은 것들)
+        // 추천 코스 가져오기 (모든 공개 코스 중 수강하지 않은 것들, 외래키 없이)
         const { data: allCourses, error: coursesError } = await supabase
           .from('courses')
           .select(`
@@ -87,31 +99,44 @@ const Dashboard: React.FC = () => {
             title,
             description,
             thumbnail_url,
-            instructor_id,
-            user_profiles!courses_instructor_id_fkey (
-              first_name,
-              last_name,
-              email
-            )
+            instructor_id
           `)
           .eq('is_published', true);
         
         if (!coursesError && allCourses) {
           const enrolledCourseIds = enrolledCoursesData.map(course => course.id);
-          const recommendedCoursesData: Course[] = allCourses
+          // 추천 코스의 강사 정보도 별도 조회
+          const filteredCourses = allCourses
             .filter((course: any) => !enrolledCourseIds.includes(course.id))
-            .slice(0, 4) // 최대 4개만
-            .map((course: any) => ({
+            .slice(0, 4); // 최대 4개만
+          
+          const recommendedInstructorIds = Array.from(new Set(filteredCourses.map(c => c.instructor_id).filter(Boolean)));
+          let recommendedInstructorMap = new Map();
+          
+          if (recommendedInstructorIds.length > 0) {
+            const { data: recommendedInstructors } = await supabase
+              .from('user_profiles')
+              .select('id, first_name, last_name, email')
+              .in('id', recommendedInstructorIds);
+            
+            if (recommendedInstructors) {
+              recommendedInstructorMap = new Map(recommendedInstructors.map(inst => [inst.id, inst]));
+            }
+          }
+
+          const recommendedCoursesData: Course[] = filteredCourses.map((course: any) => {
+            const instructor = recommendedInstructorMap.get(course.instructor_id);
+            return {
               id: course.id,
               title: course.title,
-              instructor: course.user_profiles ? 
-                `${course.user_profiles.first_name || ''} ${course.user_profiles.last_name || ''}`.trim() ||
-                course.user_profiles.email : '알 수 없음',
+              instructor: instructor ? 
+                `${instructor.first_name || ''} ${instructor.last_name || ''}`.trim() || instructor.email : '알 수 없음',
               progress: 0,
               lastAccessed: '',
               imageUrl: course.thumbnail_url || courseImages.webDev.placeholder,
               imageAlt: course.title,
-            }));
+            };
+          });
 
           setRecommendedCourses(recommendedCoursesData);
         }
